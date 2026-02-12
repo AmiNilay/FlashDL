@@ -11,6 +11,10 @@ import re
 app = Flask(__name__)
 CORS(app)
 
+# 1. SETUP COOKIE PATH
+# Checks Render's secret folder first, then local directory
+COOKIE_PATH = '/etc/secrets/cookies.txt' if os.path.exists('/etc/secrets/cookies.txt') else 'cookies.txt'
+
 TEMP_DIR = os.path.join(tempfile.gettempdir(), 'flashdl_processing')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
@@ -19,9 +23,8 @@ if not os.path.exists(TEMP_DIR):
 def home():
     return render_template('index.html')
 
-# --- NEW: INSTAGRAM DIRECT SCRAPER FALLBACK ---
+# --- INSTAGRAM DIRECT SCRAPER FALLBACK ---
 def get_instagram_image_fallback(url):
-    """Fallback to direct scraping if yt-dlp fails"""
     try:
         headers = {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
@@ -31,12 +34,10 @@ def get_instagram_image_fallback(url):
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200: return None
         
-        # Look for the og:image meta tag which Instagram usually provides
         match = re.search(r'property="og:image" content="([^"]+)"', response.text)
         if match:
             return match.group(1).replace('&amp;', '&')
         
-        # Secondary check for 'display_url' in the raw script data
         match_json = re.search(r'"display_url":"([^"]+)"', response.text)
         if match_json:
             return match_json.group(1).replace('\\u0026', '&')
@@ -80,8 +81,12 @@ def extract_info():
         if res: return jsonify(res)
 
     try:
+        # Use Cookie Path to bypass bot detection
         ydl_opts = {
-            'quiet': True, 'no_warnings': True, 'extract_flat': False,
+            'quiet': True, 
+            'no_warnings': True, 
+            'extract_flat': False,
+            'cookiefile': COOKIE_PATH if os.path.exists(COOKIE_PATH) else None,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
         }
 
@@ -95,32 +100,24 @@ def extract_info():
             thumbnail = info.get('thumbnail', '')
             formats = info.get('formats', [])
 
-            # --- IMAGE DETECTION & FALLBACK LOGIC ---
+            # --- IMAGE DETECTION ---
             is_video = any(f.get('vcodec') != 'none' for f in formats)
             
             if not is_video or info.get('extractor') == 'instagram:image' or 'instagram' in url:
-                
-                # 1. Try standard meta first
                 img_url = info.get('url') or info.get('display_url') or info.get('thumbnail')
                 
-                # 2. Try formats if meta failed
                 if not img_url and formats:
                     img_url = formats[-1].get('url')
 
-                # 3. CRITICAL: Manual Scraper Fallback if yt-dlp returned nothing
                 if not img_url or "instagram.com" in url:
                     fallback_url = get_instagram_image_fallback(url)
-                    if fallback_url:
-                        img_url = fallback_url
+                    if fallback_url: img_url = fallback_url
 
                 if not img_url:
-                    return jsonify({'success': False, 'error': 'Could not find image link for this post'}), 404
+                    return jsonify({'success': False, 'error': 'Could not find image link'}), 404
 
                 return jsonify({
-                    'success': True, 
-                    'type': 'image', 
-                    'title': title, 
-                    'thumbnail': thumbnail,
+                    'success': True, 'type': 'image', 'title': title, 'thumbnail': thumbnail,
                     'proxy_url': f"/proxy_image?url={urllib.parse.quote(img_url)}&filename={urllib.parse.quote(title)}"
                 })
 
@@ -133,7 +130,7 @@ def extract_info():
             for f in dash:
                 h = f.get('height')
                 if h and h >= 1080 and h not in seen_res:
-                    options.append({'label': f"HD {h}p (Merged High Quality)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
+                    options.append({'label': f"HD {h}p (Best Quality + Audio)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
                     seen_res.add(h)
 
             prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']
@@ -156,7 +153,6 @@ def extract_info():
             })
 
     except Exception as e:
-        # Final emergency fallback check for images before throwing error
         if 'instagram.com' in url:
             emergency_url = get_instagram_image_fallback(url)
             if emergency_url:
@@ -166,18 +162,28 @@ def extract_info():
                 })
         return jsonify({'success': False, 'error': f"Extraction failed: {str(e)}"}), 500
 
-# --- MERGE & PROXY ROUTES (Unchanged) ---
+# --- MERGE ROUTE (Uses FFmpeg in Docker) ---
 @app.route('/process_merge')
 def process_merge():
     url, fid, title = request.args.get('url'), request.args.get('format_id'), request.args.get('title', 'video')
     if not url or not fid: return "Invalid parameters", 400
+    
     filepath = os.path.join(TEMP_DIR, f"{title}_{random.randint(1000, 9999)}.mp4")
-    ydl_opts = {'format': f"{fid}+bestaudio/best", 'outtmpl': filepath, 'merge_output_format': 'mp4', 'quiet': True}
+    
+    ydl_opts = {
+        'format': f"{fid}+bestaudio/best", 
+        'outtmpl': filepath, 
+        'merge_output_format': 'mp4', 
+        'quiet': True,
+        'cookiefile': COOKIE_PATH if os.path.exists(COOKIE_PATH) else None,
+    }
+    
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
         return send_file(filepath, as_attachment=True, download_name=f"{title}.mp4")
     except Exception as e: return f"Merge Error: {str(e)}", 500
 
+# --- PROXY HANDLERS ---
 @app.route('/proxy_download')
 def proxy_download():
     u, t, e = request.args.get('url'), request.args.get('title', 'download'), request.args.get('ext', 'mp4')
