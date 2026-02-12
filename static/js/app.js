@@ -1,4 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // 0. CONFIGURATION: Link to your Render Backend
+    const BASE_URL = "https://flashdl-api.onrender.com";
+
     // 1. INITIALIZE MATERIALIZE COMPONENTS
     M.Modal.init(document.querySelectorAll('.modal'));
     var tooltips = document.querySelectorAll('.tooltipped');
@@ -120,7 +123,8 @@ document.addEventListener('DOMContentLoaded', function() {
         loader.style.display = 'block';
 
         try {
-            const response = await fetch('/extract', {
+            // Updated to use BASE_URL for Render deployment
+            const response = await fetch(`${BASE_URL}/extract`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url: url })
@@ -130,7 +134,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.success) {
                 // Set metadata
                 document.getElementById('res-title').innerText = data.title;
-                document.getElementById('res-thumb').src = data.proxy_thumbnail || data.thumbnail;
+                
+                // Construct proxy thumbnail URL
+                const thumbImg = document.getElementById('res-thumb');
+                thumbImg.src = data.proxy_thumbnail ? `${BASE_URL}${data.proxy_thumbnail}` : data.thumbnail;
 
                 const downloadLink = document.getElementById('res-link');
                 const videoOptionsDiv = document.getElementById('video-options');
@@ -143,11 +150,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 qualitySelect.innerHTML = '';
 
                 // Handle Response Type
-                if (data.type === 'image') {
-                    imageBadge.style.display = 'inline-block';
-                    downloadLink.innerText = "Download Image";
-                    downloadLink.href = data.proxy_url;
-                    downloadLink.onclick = null; // Direct link
+                if (data.type === 'image' || data.type === 'video_single') {
+                    if(data.type === 'image') imageBadge.style.display = 'inline-block';
+                    downloadLink.innerText = data.type === 'image' ? "Download Image" : "Download Video";
+                    downloadLink.href = `${BASE_URL}${data.proxy_url}`;
+                    downloadLink.onclick = null; 
                 } 
                 else if (data.type === 'video_multi') {
                     videoOptionsDiv.style.display = 'block';
@@ -161,25 +168,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         qualitySelect.appendChild(option);
                     });
 
-                    // Set Download Action
+                    // Set Download Action with Render Routing
                     downloadLink.onclick = (e) => {
                         e.preventDefault();
                         const sel = data.options[qualitySelect.value];
                         
-                        // Check if HD merge is required (1080p+ with sound)
                         if (sel.merge) {
-                            M.toast({html: 'Merging HD Audio/Video... please wait.'});
-                            window.location.href = `/process_merge?url=${encodeURIComponent(data.original_url)}&format_id=${sel.format_id}&title=${encodeURIComponent(data.title)}`;
+                            M.toast({html: 'Merging HD Audio/Video on server... please wait.'});
+                            window.location.href = `${BASE_URL}/process_merge?url=${encodeURIComponent(data.original_url)}&format_id=${sel.format_id}&title=${encodeURIComponent(data.title)}`;
                         } else {
-                            // Direct progressive download
-                            window.location.href = `/proxy_download?url=${encodeURIComponent(sel.url)}&title=${encodeURIComponent(data.title)}&ext=${sel.ext}`;
+                            window.location.href = `${BASE_URL}/proxy_download?url=${encodeURIComponent(sel.url)}&title=${encodeURIComponent(data.title)}&ext=${sel.ext}`;
                         }
                     };
-                } else {
-                    // Single file (Reddit, etc)
-                    downloadLink.innerText = "Download Video";
-                    downloadLink.href = data.proxy_url;
-                    downloadLink.onclick = null;
                 }
 
                 // Show with animation
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorMsg.innerText = "Error: " + (data.error || "Extraction failed");
             }
         } catch (err) {
-            errorMsg.innerText = "Backend Error. Check terminal.";
+            errorMsg.innerText = "Server Unreachable. Ensure Render backend is live.";
             console.error(err);
         } finally {
             loader.style.display = 'none';
