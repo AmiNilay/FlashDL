@@ -8,7 +8,8 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    
+    <link rel="stylesheet" href="static/css/style.css">
 </head>
 <body>
 
@@ -44,7 +45,7 @@
             <div id="loader" class="progress" style="display:none; margin: 30px auto; width: 50%;"><div class="indeterminate"></div></div>
             <div id="error-msg" class="red-text" style="margin-top: 20px;"></div>
 
-            <div id="result-area">
+            <div id="result-area" style="display: none;">
                 <div class="result-card fade-in-up">
                     <img id="res-thumb" class="res-thumb" src="" alt="Thumb">
                     <div class="res-details">
@@ -75,17 +76,6 @@
                 <div class="brand-item"><i class="fa-brands fa-reddit reddit"></i> Reddit</div>
                 <div class="brand-item"><i class="fa-brands fa-instagram instagram"></i> Instagram</div>
                 <div class="brand-item"><i class="fa-brands fa-tiktok tiktok"></i> TikTok</div>
-                <div class="brand-item"><i class="fa-brands fa-pinterest pinterest"></i> Pinterest</div>
-                <div class="brand-item"><i class="fa-brands fa-youtube youtube"></i> YouTube</div>
-                <div class="brand-item"><i class="fa-brands fa-facebook facebook"></i> Facebook</div>
-                <div class="brand-item"><i class="fa-brands fa-twitter twitter"></i> X (Twitter)</div>
-                <div class="brand-item"><i class="fa-brands fa-reddit reddit"></i> Reddit</div>
-                <div class="brand-item"><i class="fa-brands fa-instagram instagram"></i> Instagram</div>
-                <div class="brand-item"><i class="fa-brands fa-tiktok tiktok"></i> TikTok</div>
-                <div class="brand-item"><i class="fa-brands fa-pinterest pinterest"></i> Pinterest</div>
-                <div class="brand-item"><i class="fa-brands fa-youtube youtube"></i> YouTube</div>
-                <div class="brand-item"><i class="fa-brands fa-facebook facebook"></i> Facebook</div>
-                <div class="brand-item"><i class="fa-brands fa-twitter twitter"></i> X (Twitter)</div>
             </div>
         </div>
     </section>
@@ -110,15 +100,6 @@
                     <p>Your history is stored locally in your browser. We respect your privacy.</p>
                 </div>
             </div>
-            
-            <div id="history-section" style="display:none; margin-top: 60px; max-width: 800px; margin: 60px auto 0;">
-                <h4 class="serif-font" style="margin-bottom: 20px; text-align: center;">Recent History</h4>
-                <div class="warning-alert">
-                    <i class="material-icons">warning_amber</i>
-                    <p><strong>Important:</strong> Do not clear cache. History is local.</p>
-                </div>
-                <ul id="history-list" class="collection" style="border: none; border-radius: 12px;"></ul>
-            </div>
         </div>
     </section>
 
@@ -133,9 +114,6 @@
                     <li><a href="#modal-legal" class="modal-trigger">Disclaimer</a></li>
                 </ul>
             </div>
-            <div class="footer-col">
-                <h6>Socials</h6><ul><li><a href="#">Reddit</a></li><li><a href="#">Instagram</a></li></ul>
-            </div>
         </div>
         <p class="copyright">&copy; 2026 FlashDL. All rights reserved.</p>
     </footer>
@@ -148,11 +126,12 @@
             <button id="confirm-login" class="btn-hero" style="width: 100%; justify-content: center; margin-top: 20px;">Sign In</button>
         </div>
     </div>
+
     <div id="modal-legal" class="modal bottom-sheet"><div class="modal-content"><h4>Disclaimer</h4><p>Not affiliated with platforms.</p></div></div>
     <div id="modal-privacy" class="modal bottom-sheet"><div class="modal-content"><h4>Privacy</h4><p>No data stored on server.</p></div></div>
     <div id="modal-terms" class="modal bottom-sheet"><div class="modal-content"><h4>Terms</h4><p>Educational use only.</p></div></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="static/js/app.js"></script>
 </body>
 </html>
