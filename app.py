@@ -7,26 +7,25 @@ import os
 import tempfile
 import random
 import re
-import shutil # Required to copy the cookie file
+import shutil
 
 app = Flask(__name__)
 CORS(app)
 
-# 1. SETUP WRITABLE COOKIE PATH
-# Render secrets are read-only. We copy to /tmp to make it writable
+# 1. SETUP WRITABLE COOKIE PATH (Fixes Errno 30 Read-only filesystem)
 SECRET_PATH = '/etc/secrets/cookies.txt'
 COOKIE_PATH = os.path.join(tempfile.gettempdir(), 'cookies_writable.txt')
 
 if os.path.exists(SECRET_PATH):
     try:
-        shutil.copy(SECRET_PATH, COOKIE_PATH)
+        shutil.copy2(SECRET_PATH, COOKIE_PATH)
         print(f"✅ SUCCESS: Copied secret cookies to writable path: {COOKIE_PATH}")
     except Exception as e:
         print(f"❌ ERROR: Could not copy cookies: {e}")
-        COOKIE_PATH = SECRET_PATH # Fallback to read-only (might still cause errors)
+        COOKIE_PATH = SECRET_PATH
 elif os.path.exists('cookies.txt'):
     COOKIE_PATH = 'cookies.txt'
-    print("ℹ️ Using local cookies.txt for development")
+    print("ℹ️ Using local cookies.txt")
 else:
     COOKIE_PATH = None
     print("⚠️ WARNING: No cookie file found. YouTube may block this server.")
@@ -42,7 +41,10 @@ def home():
 # --- INSTAGRAM SCRAPER FALLBACK ---
 def get_instagram_image_fallback(url):
     try:
-        headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'}
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        }
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200: return None
         match = re.search(r'property="og:image" content="([^"]+)"', response.text)
@@ -91,7 +93,7 @@ def extract_info():
             'quiet': True, 
             'no_warnings': True, 
             'extract_flat': False,
-            'cookiefile': COOKIE_PATH, # Uses our writable copy
+            'cookiefile': COOKIE_PATH,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
         }
 
@@ -123,7 +125,7 @@ def extract_info():
             for f in dash:
                 h = f.get('height')
                 if h and h >= 1080 and h not in seen_res:
-                    options.append({'label': f"HD {h}p (Merged)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
+                    options.append({'label': f"HD {h}p (Best Quality)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
                     seen_res.add(h)
 
             prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']
@@ -131,7 +133,7 @@ def extract_info():
             for f in prog:
                 h = f.get('height')
                 if h and h not in seen_res:
-                    options.append({'label': f"Video {h}p (Direct)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
+                    options.append({'label': f"Video {h}p (Fast)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
                     seen_res.add(h)
 
             audio = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
@@ -148,6 +150,7 @@ def extract_info():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# --- MERGE ROUTE (Fixes 403 Forbidden with Headers) ---
 @app.route('/process_merge')
 def process_merge():
     url, fid, title = request.args.get('url'), request.args.get('format_id'), request.args.get('title', 'video')
@@ -159,20 +162,34 @@ def process_merge():
         'outtmpl': filepath, 
         'merge_output_format': 'mp4', 
         'quiet': True,
-        'cookiefile': COOKIE_PATH, # Uses writable copy
+        'cookiefile': COOKIE_PATH,
+        'source_address': '0.0.0.0', # Force IPv4 to avoid common cloud IPv6 bans
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            'Referer': 'https://www.youtube.com/',
+        }
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
         return send_file(filepath, as_attachment=True, download_name=f"{title}.mp4")
-    except Exception as e: return str(e), 500
+    except Exception as e: return f"Download Forbidden (403/Blocked): {str(e)}", 500
 
+# --- PROXY DOWNLOAD (Fixes 403 Forbidden on direct streams) ---
 @app.route('/proxy_download')
 def proxy_download():
     u, t, e = request.args.get('url'), request.args.get('title', 'download'), request.args.get('ext', 'mp4')
     try:
-        req = requests.get(u, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
-        return Response(stream_with_context(req.iter_content(chunk_size=4096)), content_type='application/octet-stream', headers={'Content-Disposition': f'attachment; filename="{t}.{e}"'})
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
+            'Referer': 'https://www.youtube.com/'
+        }
+        req = requests.get(u, headers=headers, stream=True, timeout=30)
+        if req.status_code == 403: return "Access Denied by YouTube (403). Use an HD option instead.", 403
+        
+        return Response(stream_with_context(req.iter_content(chunk_size=8192)), 
+                        content_type='application/octet-stream', 
+                        headers={'Content-Disposition': f'attachment; filename="{t}.{e}"'})
     except: return "Failed", 404
 
 @app.route('/proxy_image')
