@@ -1,9 +1,3 @@
-Here is a professional **README.md** tailored for your project. This will look great on your GitHub profile and clearly explains how the tool works, including the server-side merging feature.
-
----
-
-### **README.md**
-
 ```markdown
 # ⚡ FlashDL - Universal Social Media Downloader
 
