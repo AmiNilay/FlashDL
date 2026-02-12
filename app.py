@@ -7,19 +7,29 @@ import os
 import tempfile
 import random
 import re
+import shutil # Required to copy the cookie file
 
 app = Flask(__name__)
 CORS(app)
 
-# 1. SETUP COOKIE PATH & VERIFICATION
-# Render stores secret files in /etc/secrets/
-COOKIE_PATH = '/etc/secrets/cookies.txt' if os.path.exists('/etc/secrets/cookies.txt') else 'cookies.txt'
+# 1. SETUP WRITABLE COOKIE PATH
+# Render secrets are read-only. We copy to /tmp to make it writable
+SECRET_PATH = '/etc/secrets/cookies.txt'
+COOKIE_PATH = os.path.join(tempfile.gettempdir(), 'cookies_writable.txt')
 
-# Verify cookie presence in server logs on startup
-if os.path.exists(COOKIE_PATH):
-    print(f"✅ SUCCESS: Cookie file found at {COOKIE_PATH}")
+if os.path.exists(SECRET_PATH):
+    try:
+        shutil.copy(SECRET_PATH, COOKIE_PATH)
+        print(f"✅ SUCCESS: Copied secret cookies to writable path: {COOKIE_PATH}")
+    except Exception as e:
+        print(f"❌ ERROR: Could not copy cookies: {e}")
+        COOKIE_PATH = SECRET_PATH # Fallback to read-only (might still cause errors)
+elif os.path.exists('cookies.txt'):
+    COOKIE_PATH = 'cookies.txt'
+    print("ℹ️ Using local cookies.txt for development")
 else:
-    print(f"⚠️ WARNING: No cookie file found. YouTube might block requests.")
+    COOKIE_PATH = None
+    print("⚠️ WARNING: No cookie file found. YouTube may block this server.")
 
 TEMP_DIR = os.path.join(tempfile.gettempdir(), 'flashdl_processing')
 if not os.path.exists(TEMP_DIR):
@@ -29,27 +39,18 @@ if not os.path.exists(TEMP_DIR):
 def home():
     return render_template('index.html')
 
-# --- INSTAGRAM DIRECT SCRAPER FALLBACK ---
+# --- INSTAGRAM SCRAPER FALLBACK ---
 def get_instagram_image_fallback(url):
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        }
+        headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1'}
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200: return None
-        
         match = re.search(r'property="og:image" content="([^"]+)"', response.text)
-        if match:
-            return match.group(1).replace('&amp;', '&')
-        
+        if match: return match.group(1).replace('&amp;', '&')
         match_json = re.search(r'"display_url":"([^"]+)"', response.text)
-        if match_json:
-            return match_json.group(1).replace('\\u0026', '&')
-            
+        if match_json: return match_json.group(1).replace('\\u0026', '&')
         return None
-    except:
-        return None
+    except: return None
 
 # --- REDDIT BYPASS ---
 def get_reddit_video(url):
@@ -86,40 +87,30 @@ def extract_info():
         if res: return jsonify(res)
 
     try:
-        # Use Cookie Path to bypass bot detection
         ydl_opts = {
             'quiet': True, 
             'no_warnings': True, 
             'extract_flat': False,
-            'cookiefile': COOKIE_PATH if os.path.exists(COOKIE_PATH) else None,
+            'cookiefile': COOKIE_PATH, # Uses our writable copy
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-            if 'entries' in info and info['entries']:
-                info = info['entries'][0]
+            if 'entries' in info and info['entries']: info = info['entries'][0]
             
             title = clean_title(info.get('title', 'media'))
             thumbnail = info.get('thumbnail', '')
             formats = info.get('formats', [])
-
             is_video = any(f.get('vcodec') != 'none' for f in formats)
             
             if not is_video or info.get('extractor') == 'instagram:image' or 'instagram' in url:
                 img_url = info.get('url') or info.get('display_url') or info.get('thumbnail')
-                
-                if not img_url and formats:
-                    img_url = formats[-1].get('url')
-
+                if not img_url and formats: img_url = formats[-1].get('url')
                 if not img_url or "instagram.com" in url:
                     fallback_url = get_instagram_image_fallback(url)
                     if fallback_url: img_url = fallback_url
-
-                if not img_url:
-                    return jsonify({'success': False, 'error': 'Could not find image link'}), 404
-
+                
                 return jsonify({
                     'success': True, 'type': 'image', 'title': title, 'thumbnail': thumbnail,
                     'proxy_url': f"/proxy_image?url={urllib.parse.quote(img_url)}&filename={urllib.parse.quote(title)}"
@@ -127,13 +118,12 @@ def extract_info():
 
             options = []
             seen_res = set()
-
             dash = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') == 'none']
             dash.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
             for f in dash:
                 h = f.get('height')
                 if h and h >= 1080 and h not in seen_res:
-                    options.append({'label': f"HD {h}p (Requires Merge)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
+                    options.append({'label': f"HD {h}p (Merged)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
                     seen_res.add(h)
 
             prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']
@@ -162,7 +152,6 @@ def extract_info():
 def process_merge():
     url, fid, title = request.args.get('url'), request.args.get('format_id'), request.args.get('title', 'video')
     if not url or not fid: return "Invalid parameters", 400
-    
     filepath = os.path.join(TEMP_DIR, f"{title}_{random.randint(1000, 9999)}.mp4")
     
     ydl_opts = {
@@ -170,7 +159,7 @@ def process_merge():
         'outtmpl': filepath, 
         'merge_output_format': 'mp4', 
         'quiet': True,
-        'cookiefile': COOKIE_PATH if os.path.exists(COOKIE_PATH) else None,
+        'cookiefile': COOKIE_PATH, # Uses writable copy
     }
     
     try:
@@ -181,7 +170,6 @@ def process_merge():
 @app.route('/proxy_download')
 def proxy_download():
     u, t, e = request.args.get('url'), request.args.get('title', 'download'), request.args.get('ext', 'mp4')
-    if not u: return "No URL", 400
     try:
         req = requests.get(u, headers={'User-Agent': 'Mozilla/5.0'}, stream=True)
         return Response(stream_with_context(req.iter_content(chunk_size=4096)), content_type='application/octet-stream', headers={'Content-Disposition': f'attachment; filename="{t}.{e}"'})
@@ -190,7 +178,6 @@ def proxy_download():
 @app.route('/proxy_image')
 def proxy_image():
     u = request.args.get('url')
-    if not u: return "No URL", 400
     try:
         req = requests.get(u, headers={'User-Agent': 'Mozilla/5.0'}, stream=True, timeout=15)
         return Response(stream_with_context(req.iter_content(chunk_size=1024)), content_type='image/jpeg')
