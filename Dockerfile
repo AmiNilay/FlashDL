@@ -1,5 +1,5 @@
-# Use Python slim image
-FROM python:3.9-slim
+# Use a newer Python version to avoid deprecation warnings
+FROM python:3.11-slim
 
 # Install system dependencies (FFmpeg)
 RUN apt-get update && \
@@ -13,4 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 EXPOSE 5000
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "app:app"]
+
+# INCREASE TIMEOUT to 120 seconds to prevent "Worker Timeout"
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "120", "--workers", "2", "app:app"]

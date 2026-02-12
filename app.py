@@ -8,10 +8,11 @@ import tempfile
 import random
 import re
 import shutil
-import subprocess
 
 app = Flask(__name__)
-CORS(app)
+
+# IMPROVED CORS: Explicitly allow your Vercel domain
+CORS(app, resources={r"/*": {"origins": ["https://flash-dl-five.vercel.app", "http://localhost:5000"]}})
 
 # 1. SETUP WRITABLE COOKIE PATH
 SECRET_PATH = '/etc/secrets/cookies.txt'
@@ -33,32 +34,28 @@ TEMP_DIR = os.path.join(tempfile.gettempdir(), 'flashdl_processing')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
-# --- HELPER: CHECK IF FFMPEG EXISTS ---
 def is_ffmpeg_installed():
     return shutil.which("ffmpeg") is not None
 
 @app.route('/')
 def home():
-    return render_template('index.html')
+    return "FlashDL API is running. FFmpeg Status: " + ("OK" if is_ffmpeg_installed() else "Missing")
 
-# --- INSTAGRAM SCRAPER FALLBACK ---
-def get_instagram_image_fallback(url):
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)'}
-        response = requests.get(url, headers=headers, timeout=10)
-        match = re.search(r'property="og:image" content="([^"]+)"', response.text)
-        return match.group(1).replace('&amp;', '&') if match else None
-    except: return None
-
-@app.route('/extract', methods=['POST'])
+@app.route('/extract', methods=['POST', 'OPTIONS'])
 def extract_info():
+    # Handle CORS preflight
+    if request.method == 'OPTIONS':
+        return jsonify({'success': True}), 200
+
     data = request.json
     url = data.get('url')
     if not url: return jsonify({'success': False, 'error': 'No URL provided'}), 400
 
     try:
         ydl_opts = {
-            'quiet': True, 'no_warnings': True, 'extract_flat': False,
+            'quiet': True, 
+            'no_warnings': True, 
+            'extract_flat': False,
             'cookiefile': COOKIE_PATH,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
         }
@@ -68,53 +65,44 @@ def extract_info():
             
             title = "".join([c for c in info.get('title', 'media') if c.isalnum() or c==' ']).strip()
             formats = info.get('formats', [])
-            is_video = any(f.get('vcodec') != 'none' for f in formats)
             
-            if not is_video or 'instagram' in url:
-                img_url = info.get('url') or info.get('display_url') or info.get('thumbnail')
-                return jsonify({
-                    'success': True, 'type': 'image', 'title': title, 'thumbnail': info.get('thumbnail', ''),
-                    'proxy_url': f"/proxy_image?url={urllib.parse.quote(img_url)}&filename={urllib.parse.quote(title)}"
-                })
-
             options = []
             seen_res = set()
-            # 1080p+ options (Check if FFmpeg exists first)
             ffmpeg_ready = is_ffmpeg_installed()
             
+            # HD Options (1080p+)
             for f in [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') == 'none']:
                 h = f.get('height')
                 if h and h >= 1080 and h not in seen_res:
-                    label = f"HD {h}p (Best Quality)" if ffmpeg_ready else f"HD {h}p (Needs Server FFmpeg)"
-                    options.append({'label': label, 'ext': 'mp4', 'format_id': f['format_id'], 'merge': ffmpeg_ready})
+                    options.append({'label': f"HD {h}p (Merged)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': ffmpeg_ready})
                     seen_res.add(h)
             
+            # Progressive Options (720p and below)
             for f in [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']:
                 h = f.get('height')
                 if h and h not in seen_res:
-                    options.append({'label': f"Video {h}p (Direct Download)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
+                    options.append({'label': f"Video {h}p (Direct)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
                     seen_res.add(h)
 
             return jsonify({
                 'success': True, 'type': 'video_multi', 'title': title, 'thumbnail': info.get('thumbnail', ''),
                 'options': options, 'original_url': url
             })
-    except Exception as e: return jsonify({'success': False, 'error': str(e)}), 500
+    except Exception as e: 
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/process_merge')
 def process_merge():
     if not is_ffmpeg_installed():
-        return "Critical Error: FFmpeg is not installed on this server. HD downloads are disabled.", 500
+        return "Critical Error: FFmpeg not installed on server.", 500
 
     url, fid, title = request.args.get('url'), request.args.get('format_id'), request.args.get('title', 'video')
-    filename = f"dl_{random.randint(1000, 9999)}.mp4"
-    filepath = os.path.join(TEMP_DIR, filename)
+    filepath = os.path.join(TEMP_DIR, f"dl_{random.randint(1000, 9999)}.mp4")
     
     ydl_opts = {
         'format': f"{fid}+bestaudio/best", 
         'outtmpl': filepath, 
         'merge_output_format': 'mp4', 
-        'quiet': True,
         'cookiefile': COOKIE_PATH,
         'http_headers': {'Referer': 'https://www.youtube.com/'}
     }
