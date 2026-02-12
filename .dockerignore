@@ -1,0 +1,6 @@
+# Ignore frontend files so Render doesn't show the UI
+templates/
+static/
+index.html
+.git/
+README.md
