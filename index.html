@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Universal social media downloader. Download videos from Reddit, Instagram, TikTok, Pinterest, YouTube in high quality.">
     <title>FlashDL - Universal Downloader</title>
+    
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
@@ -42,8 +43,9 @@
             </div>
             
             <p class="login-hint" id="login-hint"><a href="#login-modal" class="modal-trigger">Sign in</a> to save your download history.</p>
+            
             <div id="loader" class="progress" style="display:none; margin: 30px auto; width: 50%;"><div class="indeterminate"></div></div>
-            <div id="error-msg" class="red-text" style="margin-top: 20px;"></div>
+            <div id="error-msg" class="red-text" style="margin-top: 20px; font-weight: bold;"></div>
 
             <div id="result-area" style="display: none;">
                 <div class="result-card fade-in-up">
@@ -55,7 +57,7 @@
                             <select id="quality-select" class="browser-default custom-select"></select>
                         </div>
                         <p id="image-badge" class="pill-badge" style="display:none; background: #e0e7ff; color: #4338ca; margin-top: 10px;"><i class="material-icons left" style="font-size: 1.2rem;">image</i> High Quality Image</p>
-                        <a id="res-link" href="#" class="btn-dl waves-effect">Download</a>
+                        <a id="res-link" href="#" class="btn-dl waves-effect">Download Now</a>
                     </div>
                 </div>
             </div>
@@ -76,6 +78,8 @@
                 <div class="brand-item"><i class="fa-brands fa-reddit reddit"></i> Reddit</div>
                 <div class="brand-item"><i class="fa-brands fa-instagram instagram"></i> Instagram</div>
                 <div class="brand-item"><i class="fa-brands fa-tiktok tiktok"></i> TikTok</div>
+                <div class="brand-item"><i class="fa-brands fa-pinterest pinterest"></i> Pinterest</div>
+                <div class="brand-item"><i class="fa-brands fa-youtube youtube"></i> YouTube</div>
             </div>
         </div>
     </section>
@@ -111,7 +115,6 @@
                 <ul>
                     <li><a href="#modal-privacy" class="modal-trigger">Privacy Policy</a></li>
                     <li><a href="#modal-terms" class="modal-trigger">Terms of Service</a></li>
-                    <li><a href="#modal-legal" class="modal-trigger">Disclaimer</a></li>
                 </ul>
             </div>
         </div>
@@ -127,11 +130,11 @@
         </div>
     </div>
 
-    <div id="modal-legal" class="modal bottom-sheet"><div class="modal-content"><h4>Disclaimer</h4><p>Not affiliated with platforms.</p></div></div>
     <div id="modal-privacy" class="modal bottom-sheet"><div class="modal-content"><h4>Privacy</h4><p>No data stored on server.</p></div></div>
     <div id="modal-terms" class="modal bottom-sheet"><div class="modal-content"><h4>Terms</h4><p>Educational use only.</p></div></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    
     <script src="static/js/app.js"></script>
 </body>
 </html>
