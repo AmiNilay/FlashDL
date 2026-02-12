@@ -8,31 +8,34 @@ import tempfile
 import random
 import re
 import shutil
+import subprocess
 
 app = Flask(__name__)
 CORS(app)
 
-# 1. SETUP WRITABLE COOKIE PATH (Fixes Errno 30 Read-only filesystem)
+# 1. SETUP WRITABLE COOKIE PATH
 SECRET_PATH = '/etc/secrets/cookies.txt'
 COOKIE_PATH = os.path.join(tempfile.gettempdir(), 'cookies_writable.txt')
 
 if os.path.exists(SECRET_PATH):
     try:
         shutil.copy2(SECRET_PATH, COOKIE_PATH)
-        print(f"✅ SUCCESS: Copied secret cookies to writable path: {COOKIE_PATH}")
+        print(f"✅ SUCCESS: Copied cookies to {COOKIE_PATH}")
     except Exception as e:
-        print(f"❌ ERROR: Could not copy cookies: {e}")
+        print(f"❌ ERROR: Cookie copy failed: {e}")
         COOKIE_PATH = SECRET_PATH
 elif os.path.exists('cookies.txt'):
     COOKIE_PATH = 'cookies.txt'
-    print("ℹ️ Using local cookies.txt")
 else:
     COOKIE_PATH = None
-    print("⚠️ WARNING: No cookie file found. YouTube may block this server.")
 
 TEMP_DIR = os.path.join(tempfile.gettempdir(), 'flashdl_processing')
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
+
+# --- HELPER: CHECK IF FFMPEG EXISTS ---
+def is_ffmpeg_installed():
+    return shutil.which("ffmpeg") is not None
 
 @app.route('/')
 def home():
@@ -41,38 +44,10 @@ def home():
 # --- INSTAGRAM SCRAPER FALLBACK ---
 def get_instagram_image_fallback(url):
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)'}
         response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200: return None
         match = re.search(r'property="og:image" content="([^"]+)"', response.text)
-        if match: return match.group(1).replace('&amp;', '&')
-        match_json = re.search(r'"display_url":"([^"]+)"', response.text)
-        if match_json: return match_json.group(1).replace('\\u0026', '&')
-        return None
-    except: return None
-
-# --- REDDIT BYPASS ---
-def get_reddit_video(url):
-    try:
-        clean_url = url.split('?')[0].rstrip('/')
-        json_url = clean_url + '.json'
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36'}
-        r = requests.get(json_url, headers=headers, timeout=10)
-        if r.status_code != 200: return None
-        data = r.json()
-        post = data[0]['data']['children'][0]['data']
-        title = post.get('title', 'Reddit Video')
-        thumbnail = post.get('thumbnail', '')
-        v_url = post['secure_media']['reddit_video'].get('fallback_url') if 'secure_media' in post and post['secure_media'] else None
-        if v_url:
-            return {
-                'success': True, 'type': 'video_single', 'title': title, 'thumbnail': thumbnail,
-                'proxy_url': f"/proxy_download?url={urllib.parse.quote(v_url)}&title={urllib.parse.quote(title)}&ext=mp4"
-            }
-        return None
+        return match.group(1).replace('&amp;', '&') if match else None
     except: return None
 
 @app.route('/extract', methods=['POST'])
@@ -81,81 +56,59 @@ def extract_info():
     url = data.get('url')
     if not url: return jsonify({'success': False, 'error': 'No URL provided'}), 400
 
-    def clean_title(t):
-        return "".join([c for c in t if c.isalpha() or c.isdigit() or c==' ']).strip()
-
-    if "reddit.com" in url or "redd.it" in url:
-        res = get_reddit_video(url)
-        if res: return jsonify(res)
-
     try:
         ydl_opts = {
-            'quiet': True, 
-            'no_warnings': True, 
-            'extract_flat': False,
+            'quiet': True, 'no_warnings': True, 'extract_flat': False,
             'cookiefile': COOKIE_PATH,
             'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
         }
-
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             if 'entries' in info and info['entries']: info = info['entries'][0]
             
-            title = clean_title(info.get('title', 'media'))
-            thumbnail = info.get('thumbnail', '')
+            title = "".join([c for c in info.get('title', 'media') if c.isalnum() or c==' ']).strip()
             formats = info.get('formats', [])
             is_video = any(f.get('vcodec') != 'none' for f in formats)
             
-            if not is_video or info.get('extractor') == 'instagram:image' or 'instagram' in url:
+            if not is_video or 'instagram' in url:
                 img_url = info.get('url') or info.get('display_url') or info.get('thumbnail')
-                if not img_url and formats: img_url = formats[-1].get('url')
-                if not img_url or "instagram.com" in url:
-                    fallback_url = get_instagram_image_fallback(url)
-                    if fallback_url: img_url = fallback_url
-                
                 return jsonify({
-                    'success': True, 'type': 'image', 'title': title, 'thumbnail': thumbnail,
+                    'success': True, 'type': 'image', 'title': title, 'thumbnail': info.get('thumbnail', ''),
                     'proxy_url': f"/proxy_image?url={urllib.parse.quote(img_url)}&filename={urllib.parse.quote(title)}"
                 })
 
             options = []
             seen_res = set()
-            dash = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') == 'none']
-            dash.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
-            for f in dash:
+            # 1080p+ options (Check if FFmpeg exists first)
+            ffmpeg_ready = is_ffmpeg_installed()
+            
+            for f in [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') == 'none']:
                 h = f.get('height')
                 if h and h >= 1080 and h not in seen_res:
-                    options.append({'label': f"HD {h}p (Best Quality)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
+                    label = f"HD {h}p (Best Quality)" if ffmpeg_ready else f"HD {h}p (Needs Server FFmpeg)"
+                    options.append({'label': label, 'ext': 'mp4', 'format_id': f['format_id'], 'merge': ffmpeg_ready})
                     seen_res.add(h)
-
-            prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']
-            prog.sort(key=lambda x: x.get('height', 0) or 0, reverse=True)
-            for f in prog:
+            
+            for f in [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']:
                 h = f.get('height')
                 if h and h not in seen_res:
-                    options.append({'label': f"Video {h}p (Fast)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
+                    options.append({'label': f"Video {h}p (Direct Download)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
                     seen_res.add(h)
 
-            audio = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
-            if audio:
-                best_a = sorted(audio, key=lambda x: x.get('abr', 0) or 0)[-1]
-                options.append({'label': "Audio Only (MP3)", 'ext': 'mp3', 'url': best_a['url'], 'merge': False})
-
             return jsonify({
-                'success': True, 'type': 'video_multi', 'title': title, 'thumbnail': thumbnail,
-                'proxy_thumbnail': f"/proxy_image?url={urllib.parse.quote(thumbnail)}",
+                'success': True, 'type': 'video_multi', 'title': title, 'thumbnail': info.get('thumbnail', ''),
                 'options': options, 'original_url': url
             })
+    except Exception as e: return jsonify({'success': False, 'error': str(e)}), 500
 
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# --- MERGE ROUTE (Fixes 403 Forbidden with Headers) ---
 @app.route('/process_merge')
 def process_merge():
+    if not is_ffmpeg_installed():
+        return "Critical Error: FFmpeg is not installed on this server. HD downloads are disabled.", 500
+
     url, fid, title = request.args.get('url'), request.args.get('format_id'), request.args.get('title', 'video')
-    if not url or not fid: return "Invalid parameters", 400
-    filepath = os.path.join(TEMP_DIR, f"{title}_{random.randint(1000, 9999)}.mp4")
+    filename = f"dl_{random.randint(1000, 9999)}.mp4"
+    filepath = os.path.join(TEMP_DIR, filename)
     
     ydl_opts = {
         'format': f"{fid}+bestaudio/best", 
@@ -163,30 +116,20 @@ def process_merge():
         'merge_output_format': 'mp4', 
         'quiet': True,
         'cookiefile': COOKIE_PATH,
-        'source_address': '0.0.0.0', # Force IPv4 to avoid common cloud IPv6 bans
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-            'Referer': 'https://www.youtube.com/',
-        }
+        'http_headers': {'Referer': 'https://www.youtube.com/'}
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
         return send_file(filepath, as_attachment=True, download_name=f"{title}.mp4")
-    except Exception as e: return f"Download Forbidden (403/Blocked): {str(e)}", 500
+    except Exception as e: return f"Backend Error: {str(e)}", 500
 
-# --- PROXY DOWNLOAD (Fixes 403 Forbidden on direct streams) ---
 @app.route('/proxy_download')
 def proxy_download():
     u, t, e = request.args.get('url'), request.args.get('title', 'download'), request.args.get('ext', 'mp4')
     try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/123.0.0.0 Safari/537.36',
-            'Referer': 'https://www.youtube.com/'
-        }
+        headers = {'User-Agent': 'Mozilla/5.0', 'Referer': 'https://www.youtube.com/'}
         req = requests.get(u, headers=headers, stream=True, timeout=30)
-        if req.status_code == 403: return "Access Denied by YouTube (403). Use an HD option instead.", 403
-        
         return Response(stream_with_context(req.iter_content(chunk_size=8192)), 
                         content_type='application/octet-stream', 
                         headers={'Content-Disposition': f'attachment; filename="{t}.{e}"'})
