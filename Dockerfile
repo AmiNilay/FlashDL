@@ -1,4 +1,4 @@
-# Use a newer Python version to avoid deprecation warnings
+# Use a modern Python version
 FROM python:3.11-slim
 
 # Install system dependencies (FFmpeg)
@@ -8,11 +8,15 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Copy and install Python requirements
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of your application
 COPY . .
 
 EXPOSE 5000
 
-# INCREASE TIMEOUT to 120 seconds to prevent "Worker Timeout"
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "120", "--workers", "2", "app:app"]
+# Use $PORT from Render to prevent port-detection restart loops
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT --timeout 120 --workers 2 app:app"]
