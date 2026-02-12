@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Universal social media downloader. Download videos from Reddit, Instagram, TikTok, Pinterest, YouTube in high quality.">
+    <title>FlashDL - Universal Downloader</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+    <nav>
+        <div class="nav-wrapper">
+            <a href="#" class="brand-logo serif-font"><i class="material-icons">bolt</i> FlashDL</a>
+            <ul>
+                <li><a href="#" id="theme-toggle" class="tooltipped" data-position="bottom" data-tooltip="Switch Theme"><i class="material-icons" id="theme-icon">dark_mode</i></a></li>
+                <li id="auth-btn"><a href="#login-modal" class="modal-trigger nav-btn btn-black waves-effect">Sign In</a></li>
+                <li id="user-display" style="display:none;"><a href="#" id="logout-btn" class="nav-btn btn-ghost">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="hero-section">
+        <div class="container">
+            <span class="pill-badge fade-in">Free & Unlimited Downloads</span>
+            <h1 class="hero-title fade-in">Download Content from <br><span>Any Platform</span></h1>
+            <p class="hero-subtitle fade-in">Save posts, images, and videos from Reddit, Pinterest, Instagram, TikTok, YouTube, and more.</p>
+
+            <div class="download-container fade-in-up">
+                <div class="input-box">
+                    <i class="material-icons prefix-icon">link</i>
+                    <input id="url-input" type="text" placeholder="Paste your link here...">
+                    <i class="material-icons clear-btn tooltipped" id="clear-btn" style="display: none;" data-tooltip="Clear Text">close</i>
+                </div>
+                <button id="download-btn" class="btn-hero waves-effect waves-light tooltipped" data-tooltip="Fetch Content">
+                    Download <i class="material-icons right">download</i>
+                </button>
+            </div>
+            
+            <p class="login-hint" id="login-hint"><a href="#login-modal" class="modal-trigger">Sign in</a> to save your download history.</p>
+            <div id="loader" class="progress" style="display:none; margin: 30px auto; width: 50%;"><div class="indeterminate"></div></div>
+            <div id="error-msg" class="red-text" style="margin-top: 20px;"></div>
+
+            <div id="result-area">
+                <div class="result-card fade-in-up">
+                    <img id="res-thumb" class="res-thumb" src="" alt="Thumb">
+                    <div class="res-details">
+                        <h6 id="res-title">Media Title</h6>
+                        <div id="video-options" style="display:none; margin-top: 15px;">
+                            <label style="font-weight: 600; color: var(--text-muted);">Select Quality:</label>
+                            <select id="quality-select" class="browser-default custom-select"></select>
+                        </div>
+                        <p id="image-badge" class="pill-badge" style="display:none; background: #e0e7ff; color: #4338ca; margin-top: 10px;"><i class="material-icons left" style="font-size: 1.2rem;">image</i> High Quality Image</p>
+                        <a id="res-link" href="#" class="btn-dl waves-effect">Download</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="platforms-section">
+        <h5 class="marquee-label">Supported Platforms</h5>
+        <div class="marquee-wrapper">
+            <div class="marquee-content">
+                <div class="brand-item"><i class="fa-brands fa-reddit reddit"></i> Reddit</div>
+                <div class="brand-item"><i class="fa-brands fa-instagram instagram"></i> Instagram</div>
+                <div class="brand-item"><i class="fa-brands fa-tiktok tiktok"></i> TikTok</div>
+                <div class="brand-item"><i class="fa-brands fa-pinterest pinterest"></i> Pinterest</div>
+                <div class="brand-item"><i class="fa-brands fa-youtube youtube"></i> YouTube</div>
+                <div class="brand-item"><i class="fa-brands fa-facebook facebook"></i> Facebook</div>
+                <div class="brand-item"><i class="fa-brands fa-twitter twitter"></i> X (Twitter)</div>
+                <div class="brand-item"><i class="fa-brands fa-reddit reddit"></i> Reddit</div>
+                <div class="brand-item"><i class="fa-brands fa-instagram instagram"></i> Instagram</div>
+                <div class="brand-item"><i class="fa-brands fa-tiktok tiktok"></i> TikTok</div>
+                <div class="brand-item"><i class="fa-brands fa-pinterest pinterest"></i> Pinterest</div>
+                <div class="brand-item"><i class="fa-brands fa-youtube youtube"></i> YouTube</div>
+                <div class="brand-item"><i class="fa-brands fa-facebook facebook"></i> Facebook</div>
+                <div class="brand-item"><i class="fa-brands fa-twitter twitter"></i> X (Twitter)</div>
+                <div class="brand-item"><i class="fa-brands fa-reddit reddit"></i> Reddit</div>
+                <div class="brand-item"><i class="fa-brands fa-instagram instagram"></i> Instagram</div>
+                <div class="brand-item"><i class="fa-brands fa-tiktok tiktok"></i> TikTok</div>
+                <div class="brand-item"><i class="fa-brands fa-pinterest pinterest"></i> Pinterest</div>
+                <div class="brand-item"><i class="fa-brands fa-youtube youtube"></i> YouTube</div>
+                <div class="brand-item"><i class="fa-brands fa-facebook facebook"></i> Facebook</div>
+                <div class="brand-item"><i class="fa-brands fa-twitter twitter"></i> X (Twitter)</div>
+            </div>
+        </div>
+    </section>
+
+    <section class="features-section">
+        <div class="container">
+            <h2 class="section-header serif-font">Why Choose FlashDL?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="icon-box"><i class="material-icons">download</i></div>
+                    <h4>Easy Downloads</h4>
+                    <p>Paste the URL and click download. Works for Reddit, Instagram, and more.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box"><i class="material-icons">bolt</i></div>
+                    <h4>Fast & Free</h4>
+                    <p>Optimized for speed. No registration required.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-box"><i class="material-icons">security</i></div>
+                    <h4>Privacy First</h4>
+                    <p>Your history is stored locally in your browser. We respect your privacy.</p>
+                </div>
+            </div>
+            
+            <div id="history-section" style="display:none; margin-top: 60px; max-width: 800px; margin: 60px auto 0;">
+                <h4 class="serif-font" style="margin-bottom: 20px; text-align: center;">Recent History</h4>
+                <div class="warning-alert">
+                    <i class="material-icons">warning_amber</i>
+                    <p><strong>Important:</strong> Do not clear cache. History is local.</p>
+                </div>
+                <ul id="history-list" class="collection" style="border: none; border-radius: 12px;"></ul>
+            </div>
+        </div>
+    </section>
+
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand"><h5 class="serif-font">FlashDL</h5><p class="footer-desc">Professional downloader for educational use.</p></div>
+            <div class="footer-col">
+                <h6>Legal</h6>
+                <ul>
+                    <li><a href="#modal-privacy" class="modal-trigger">Privacy Policy</a></li>
+                    <li><a href="#modal-terms" class="modal-trigger">Terms of Service</a></li>
+                    <li><a href="#modal-legal" class="modal-trigger">Disclaimer</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h6>Socials</h6><ul><li><a href="#">Reddit</a></li><li><a href="#">Instagram</a></li></ul>
+            </div>
+        </div>
+        <p class="copyright">&copy; 2026 FlashDL. All rights reserved.</p>
+    </footer>
+
+    <div id="login-modal" class="modal">
+        <div class="modal-content center-align">
+            <h4 class="serif-font">Welcome Back</h4>
+            <div class="input-field"><input id="email" type="email" placeholder="Email"></div>
+            <div class="input-field"><input id="password" type="password" placeholder="Password"></div>
+            <button id="confirm-login" class="btn-hero" style="width: 100%; justify-content: center; margin-top: 20px;">Sign In</button>
+        </div>
+    </div>
+    <div id="modal-legal" class="modal bottom-sheet"><div class="modal-content"><h4>Disclaimer</h4><p>Not affiliated with platforms.</p></div></div>
+    <div id="modal-privacy" class="modal bottom-sheet"><div class="modal-content"><h4>Privacy</h4><p>No data stored on server.</p></div></div>
+    <div id="modal-terms" class="modal bottom-sheet"><div class="modal-content"><h4>Terms</h4><p>Educational use only.</p></div></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

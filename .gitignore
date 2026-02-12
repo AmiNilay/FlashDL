@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.env
+.venv
+venv/
+flashdl_processing/
+*.mp4
+*.mp3
+*.jpg
+*.jpeg
+*.png
+ffmpeg.exe
+ffprobe.exe
