@@ -4,3 +4,8 @@ static/
 index.html
 .git/
 README.md
+__pycache__
+*.pyc
+.git
+.env
+venv

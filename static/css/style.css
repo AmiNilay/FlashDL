@@ -43,6 +43,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
 }
 
 h1, h2, h3, h4, h5, h6, .serif-font { 
@@ -528,17 +529,31 @@ footer {
 .hero-subtitle { animation-delay: 0.2s; } 
 .download-container { animation-delay: 0.3s; }
 
-/* --- RESPONSIVE & MOBILE --- */
+/* --- RESPONSIVE & MOBILE OPTIMIZATIONS --- */
 @media (max-width: 768px) {
+    /* Fonts & Headings */
     .hero-title { font-size: 2.5rem; } 
-    .download-container { flex-direction: column; }
+    .nav-btn { padding: 0 16px; font-size: 0.85rem; }
+
+    /* Stack Input Area */
+    .download-container { flex-direction: column; width: 100%; } 
+    .input-box { width: 100%; }
     .input-box input { padding-right: 50px !important; } 
     .btn-hero { width: 100%; justify-content: center; }
+
+    /* Sections */
     .features-section { padding: 60px 20px; } 
+
+    /* Footer Stacking */
     .footer-content { grid-template-columns: 1fr; gap: 40px; text-align: center; }
     .footer-desc { margin: 0 auto; } 
-    .result-card { flex-direction: column; text-align: center; padding: 30px; }
+
+    /* Result Card Stacking */
+    .result-card { flex-direction: column; text-align: center; padding: 25px; }
     .res-thumb { width: 100%; height: auto; aspect-ratio: 16/9; margin-bottom: 20px; }
+    .res-details { width: 100%; }
+
+    /* Feature Cards */
     .feature-card { text-align: center; } 
     .icon-box { margin: 0 auto 20px; }
 }
@@ -548,5 +563,6 @@ footer {
     background: var(--bg-body) !important; 
     color: var(--text-main) !important; 
     border-radius: 16px; 
+    max-height: 85%; /* Prevents modal from being too tall on mobile */
 }
-.modal-content { padding: 40px !important; }
+.modal-content { padding: 30px !important; }
