@@ -1,38 +1,40 @@
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yt_dlp
-import os, shutil, tempfile, random
+import os, shutil, tempfile
 
 app = Flask(__name__)
-# Replace this with your actual Vercel URL
-CORS(app, resources={r"/*": {"origins": "https://flash-dl-five.vercel.app"}})
-
-def is_ffmpeg_installed():
-    return shutil.which("ffmpeg") is not None
+CORS(app) # Crucial for Vercel communication
 
 @app.route('/')
-def health_check():
-    status = "OK" if is_ffmpeg_installed() else "MISSING"
-    return f"FlashDL API is live. FFmpeg Status: {status}"
+def home():
+    return "FlashDL API is live. FFmpeg is " + ("OK" if shutil.which("ffmpeg") else "MISSING")
 
 @app.route('/extract', methods=['POST'])
-def extract_info():
-    data = request.json
-    url = data.get('url')
-    if not url: return jsonify({'success': False, 'error': 'No URL'}), 400
+def extract():
+    url = request.json.get('url')
     try:
-        ydl_opts = {'quiet': True, 'user_agent': 'Mozilla/5.0'}
+        ydl_opts = {'quiet': True, 'no_warnings': True}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            if 'entries' in info: info = info['entries'][0]
             return jsonify({
-                'success': True, 
-                'title': info.get('title', 'video'),
-                'options': [{'label': f"{f.get('height')}p", 'format_id': f['format_id'], 'merge': True} for f in info.get('formats', []) if f.get('height')],
-                'original_url': url
+                'success': True,
+                'title': info.get('title', 'Media'),
+                'options': [{'format_id': 'best'}] # Simplified for stability
             })
-    except Exception as e: return jsonify({'success': False, 'error': str(e)}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/process_merge')
+def download():
+    url = request.args.get('url')
+    # This handles both YouTube and Pinterest automatically
+    tmp_dir = tempfile.gettempdir()
+    output = os.path.join(tmp_dir, 'download.mp4')
+    ydl_opts = {'outtmpl': output, 'format': 'best'}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        ydl.download([url])
+    return send_file(output, as_attachment=True)
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
