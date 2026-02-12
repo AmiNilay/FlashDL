@@ -11,9 +11,15 @@ import re
 app = Flask(__name__)
 CORS(app)
 
-# 1. SETUP COOKIE PATH
-# Checks Render's secret folder first, then local directory
+# 1. SETUP COOKIE PATH & VERIFICATION
+# Render stores secret files in /etc/secrets/
 COOKIE_PATH = '/etc/secrets/cookies.txt' if os.path.exists('/etc/secrets/cookies.txt') else 'cookies.txt'
+
+# Verify cookie presence in server logs on startup
+if os.path.exists(COOKIE_PATH):
+    print(f"✅ SUCCESS: Cookie file found at {COOKIE_PATH}")
+else:
+    print(f"⚠️ WARNING: No cookie file found. YouTube might block requests.")
 
 TEMP_DIR = os.path.join(tempfile.gettempdir(), 'flashdl_processing')
 if not os.path.exists(TEMP_DIR):
@@ -29,7 +35,6 @@ def get_instagram_image_fallback(url):
         headers = {
             'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
         }
         response = requests.get(url, headers=headers, timeout=10)
         if response.status_code != 200: return None
@@ -100,7 +105,6 @@ def extract_info():
             thumbnail = info.get('thumbnail', '')
             formats = info.get('formats', [])
 
-            # --- IMAGE DETECTION ---
             is_video = any(f.get('vcodec') != 'none' for f in formats)
             
             if not is_video or info.get('extractor') == 'instagram:image' or 'instagram' in url:
@@ -121,7 +125,6 @@ def extract_info():
                     'proxy_url': f"/proxy_image?url={urllib.parse.quote(img_url)}&filename={urllib.parse.quote(title)}"
                 })
 
-            # --- VIDEO & AUDIO ---
             options = []
             seen_res = set()
 
@@ -130,7 +133,7 @@ def extract_info():
             for f in dash:
                 h = f.get('height')
                 if h and h >= 1080 and h not in seen_res:
-                    options.append({'label': f"HD {h}p (Best Quality + Audio)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
+                    options.append({'label': f"HD {h}p (Requires Merge)", 'ext': 'mp4', 'format_id': f['format_id'], 'merge': True})
                     seen_res.add(h)
 
             prog = [f for f in formats if f.get('vcodec') != 'none' and f.get('acodec') != 'none']
@@ -138,7 +141,7 @@ def extract_info():
             for f in prog:
                 h = f.get('height')
                 if h and h not in seen_res:
-                    options.append({'label': f"Video {h}p (Fast)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
+                    options.append({'label': f"Video {h}p (Direct)", 'ext': 'mp4', 'url': f['url'], 'merge': False})
                     seen_res.add(h)
 
             audio = [f for f in formats if f.get('vcodec') == 'none' and f.get('acodec') != 'none']
@@ -153,16 +156,8 @@ def extract_info():
             })
 
     except Exception as e:
-        if 'instagram.com' in url:
-            emergency_url = get_instagram_image_fallback(url)
-            if emergency_url:
-                return jsonify({
-                    'success': True, 'type': 'image', 'title': "Instagram Photo", 'thumbnail': emergency_url,
-                    'proxy_url': f"/proxy_image?url={urllib.parse.quote(emergency_url)}&filename=instagram_photo"
-                })
-        return jsonify({'success': False, 'error': f"Extraction failed: {str(e)}"}), 500
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-# --- MERGE ROUTE (Uses FFmpeg in Docker) ---
 @app.route('/process_merge')
 def process_merge():
     url, fid, title = request.args.get('url'), request.args.get('format_id'), request.args.get('title', 'video')
@@ -181,9 +176,8 @@ def process_merge():
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl: ydl.download([url])
         return send_file(filepath, as_attachment=True, download_name=f"{title}.mp4")
-    except Exception as e: return f"Merge Error: {str(e)}", 500
+    except Exception as e: return str(e), 500
 
-# --- PROXY HANDLERS ---
 @app.route('/proxy_download')
 def proxy_download():
     u, t, e = request.args.get('url'), request.args.get('title', 'download'), request.args.get('ext', 'mp4')
