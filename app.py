@@ -6,10 +6,9 @@ from flask_cors import CORS
 import yt_dlp
 
 app = Flask(__name__)
-# Allow Vercel frontend to talk to this backend
 CORS(app)
 
-# 1. SETUP ABSOLUTE PATHS
+# Setup path for cookies
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BASE_DIR, 'cookies.txt')
 
@@ -18,9 +17,8 @@ def is_ffmpeg_installed():
 
 @app.route('/')
 def home():
-    # Health check for Render Logs
-    cookie_status = "FOUND" if os.path.exists(COOKIES_FILE) else "MISSING"
     ffmpeg_status = "OK" if is_ffmpeg_installed() else "MISSING"
+    cookie_status = "FOUND" if os.path.exists(COOKIES_FILE) else "MISSING"
     return f"FlashDL API. FFmpeg: {ffmpeg_status}. Cookies: {cookie_status}"
 
 @app.route('/extract', methods=['POST'])
@@ -30,18 +28,20 @@ def extract_info():
     if not url: return jsonify({'success': False, 'error': 'No URL provided'}), 400
 
     try:
-        # STEALTH MODE CONFIGURATION
+        # MOBILE APP EMULATION CONFIG
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'cookiefile': COOKIES_FILE,
-            # Mimic a modern browser to bypass 403 Forbidden
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'referer': 'https://www.google.com/',
-            'http_headers': {
-                'Accept-Language': 'en-US,en;q=0.9',
-            }
+            # Target Android/iOS clients to bypass 403 blocks
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios'],
+                    'skip': ['dash', 'hls']
+                }
+            },
+            'user_agent': 'com.google.android.youtube/19.05.35 (Linux; U; Android 11; Pixel 4 XL)',
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -57,8 +57,6 @@ def extract_info():
 
     except Exception as e:
         print(f"Extraction Error: {str(e)}")
-        if "Forbidden" in str(e) or "403" in str(e):
-             return jsonify({'success': False, 'error': 'YouTube blocked the server. Fresh cookies required.'}), 403
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/process_merge')
@@ -68,17 +66,21 @@ def download_media():
 
     try:
         tmp_dir = tempfile.gettempdir()
-        # Use dynamic extension handling to avoid "Format not available" errors
         output_template = os.path.join(tmp_dir, 'flashdl_%(id)s.%(ext)s')
         
         ydl_opts = {
             'outtmpl': output_template,
-            'format': 'best', # Grab best single file to avoid FFmpeg merge issues
+            'format': 'best', 
             'quiet': True,
             'cookiefile': COOKIES_FILE,
             'nocheckcertificate': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'referer': 'https://www.google.com/',
+            # Use Mobile App player signatures for the download phase too
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios']
+                }
+            },
+            'user_agent': 'com.google.android.youtube/19.05.35 (Linux; U; Android 11; Pixel 4 XL)',
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -86,7 +88,6 @@ def download_media():
             final_filename = ydl.prepare_filename(info)
 
         if final_filename and os.path.exists(final_filename):
-            # Send file to user (browser will handle the .mp4 rename)
             return send_file(final_filename, as_attachment=True, download_name='video.mp4')
         else:
             return "Error: Could not locate downloaded file.", 500
