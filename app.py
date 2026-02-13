@@ -9,7 +9,7 @@ app = Flask(__name__)
 # Allow Vercel frontend to talk to this backend
 CORS(app)
 
-# 1. SETUP ABSOLUTE PATHS TO PREVENT FILE NOT FOUND ERRORS
+# 1. SETUP ABSOLUTE PATHS
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BASE_DIR, 'cookies.txt')
 
@@ -18,7 +18,7 @@ def is_ffmpeg_installed():
 
 @app.route('/')
 def home():
-    # Debug info to check if server is healthy
+    # Health check for Render Logs
     cookie_status = "FOUND" if os.path.exists(COOKIES_FILE) else "MISSING"
     ffmpeg_status = "OK" if is_ffmpeg_installed() else "MISSING"
     return f"FlashDL API. FFmpeg: {ffmpeg_status}. Cookies: {cookie_status}"
@@ -30,34 +30,35 @@ def extract_info():
     if not url: return jsonify({'success': False, 'error': 'No URL provided'}), 400
 
     try:
-        # Configuration to bypass bot detection
+        # STEALTH MODE CONFIGURATION
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'nocheckcertificate': True,
             'cookiefile': COOKIES_FILE,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            # Mimic a modern browser to bypass 403 Forbidden
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'referer': 'https://www.google.com/',
+            'http_headers': {
+                'Accept-Language': 'en-US,en;q=0.9',
+            }
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-            
-            # Handle playlists (just take the first video)
-            if 'entries' in info:
-                info = info['entries'][0]
+            if 'entries' in info: info = info['entries'][0]
 
             return jsonify({
                 'success': True,
                 'title': info.get('title', 'Video'),
                 'thumbnail': info.get('thumbnail'),
-                # We return a generic 'best' option to the frontend
                 'options': [{'format_id': 'best', 'ext': 'mp4'}]
             })
 
     except Exception as e:
         print(f"Extraction Error: {str(e)}")
-        if "Sign in" in str(e):
-             return jsonify({'success': False, 'error': 'YouTube blocked the server. Cookies need refresh.'}), 403
+        if "Forbidden" in str(e) or "403" in str(e):
+             return jsonify({'success': False, 'error': 'YouTube blocked the server. Fresh cookies required.'}), 403
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/process_merge')
@@ -67,31 +68,25 @@ def download_media():
 
     try:
         tmp_dir = tempfile.gettempdir()
-        
-        # FIXED: DYNAMIC OUTPUT TEMPLATE
-        # We use '%(id)s.%(ext)s' so yt-dlp can choose the correct extension (webm/mp4/mkv)
-        # instead of forcing .mp4 which causes the "Format not available" error.
+        # Use dynamic extension handling to avoid "Format not available" errors
         output_template = os.path.join(tmp_dir, 'flashdl_%(id)s.%(ext)s')
-
+        
         ydl_opts = {
             'outtmpl': output_template,
-            'format': 'best', # Just get the best single file. No merging.
+            'format': 'best', # Grab best single file to avoid FFmpeg merge issues
             'quiet': True,
             'cookiefile': COOKIES_FILE,
             'nocheckcertificate': True,
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'referer': 'https://www.google.com/',
         }
 
-        final_filename = None
-        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # 1. Extract info first to know the filename
             info = ydl.extract_info(url, download=True)
-            # 2. Ask yt-dlp what the actual filename is
             final_filename = ydl.prepare_filename(info)
 
-        # 3. Send that specific file back to the user
         if final_filename and os.path.exists(final_filename):
+            # Send file to user (browser will handle the .mp4 rename)
             return send_file(final_filename, as_attachment=True, download_name='video.mp4')
         else:
             return "Error: Could not locate downloaded file.", 500
