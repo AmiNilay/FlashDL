@@ -1,21 +1,18 @@
 import os
 import shutil
-import tempfile
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 import yt_dlp
 
 app = Flask(__name__)
-
-# ✅ Strong CORS for production
-CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 COOKIES_FILE = os.path.join(BASE_DIR, 'cookies.txt')
 
 
 # -----------------------------
-# Utility Checks
+# Utility
 # -----------------------------
 def is_ffmpeg_installed():
     return shutil.which("ffmpeg") is not None
@@ -26,9 +23,8 @@ def get_ydl_base_options():
         "quiet": True,
         "nocheckcertificate": True,
         "noplaylist": True,
-        "retries": 15,
-        "fragment_retries": 15,
-        "socket_timeout": 30,
+        "retries": 10,
+        "fragment_retries": 10,
         "geo_bypass": True,
         "geo_bypass_country": "US",
         "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
@@ -37,22 +33,9 @@ def get_ydl_base_options():
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/120.0.0.0 Safari/537.36"
-            ),
-            "Accept-Language": "en-US,en;q=0.9"
+            )
         }
     }
-
-
-# -----------------------------
-# Global Error Handler (Debug Mode Enabled)
-# -----------------------------
-@app.errorhandler(Exception)
-def handle_exception(e):
-    print("GLOBAL ERROR:", str(e))
-    return jsonify({
-        "success": False,
-        "error": str(e)  # Shows real error for debugging
-    }), 500
 
 
 # -----------------------------
@@ -62,13 +45,13 @@ def handle_exception(e):
 def home():
     return jsonify({
         "status": "running",
-        "ffmpeg_installed": is_ffmpeg_installed(),
-        "cookies_found": os.path.exists(COOKIES_FILE)
+        "ffmpeg": "OK" if is_ffmpeg_installed() else "MISSING",
+        "cookies": "FOUND" if os.path.exists(COOKIES_FILE) else "MISSING"
     })
 
 
 # -----------------------------
-# Extract Video Info
+# Extract Info Route
 # -----------------------------
 @app.route("/extract", methods=["POST"])
 def extract_info():
@@ -80,58 +63,63 @@ def extract_info():
 
     ydl_opts = get_ydl_base_options()
     ydl_opts["skip_download"] = True
+    ydl_opts["format"] = "best"
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=False)
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-        if "entries" in info:
-            info = info["entries"][0]
+            if "entries" in info:
+                info = info["entries"][0]
 
-    return jsonify({
-        "success": True,
-        "title": info.get("title", "Video"),
-        "thumbnail": info.get("thumbnail"),
-        "duration": info.get("duration"),
-        "options": [
-            {"label": "Best Quality (MP4)", "value": "best"}
-        ]
-    })
+        return jsonify({
+            "success": True,
+            "title": info.get("title"),
+            "thumbnail": info.get("thumbnail"),
+            "duration": info.get("duration"),
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 # -----------------------------
-# Download + Merge Route
+# FREE DOWNLOAD ROUTE
 # -----------------------------
 @app.route("/process_merge")
-def download_media():
+def process_merge():
     url = request.args.get("url")
 
     if not url:
         return jsonify({"success": False, "error": "No URL provided"}), 400
 
-    tmp_dir = tempfile.gettempdir()
-    filename_template = f"flashdl_{os.urandom(4).hex()}.%(ext)s"
-    output_template = os.path.join(tmp_dir, filename_template)
-
     ydl_opts = get_ydl_base_options()
+    ydl_opts["skip_download"] = True
+    ydl_opts["format"] = "best"
 
-    ydl_opts.update({
-        "outtmpl": output_template,
-        "format": "bv*+ba/best",
-        "merge_output_format": "mp4",
-    })
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
 
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(url, download=True)
-        downloaded_file = ydl.prepare_filename(info)
+            if "entries" in info:
+                info = info["entries"][0]
 
-    base, _ = os.path.splitext(downloaded_file)
-    final_path = base + ".mp4" if os.path.exists(base + ".mp4") else downloaded_file
+            direct_url = info.get("url")
 
-    return send_file(
-        final_path,
-        as_attachment=True,
-        download_name="video.mp4"
-    )
+        return jsonify({
+            "success": True,
+            "download_url": direct_url,
+            "title": info.get("title")
+        })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
 
 
 if __name__ == "__main__":
