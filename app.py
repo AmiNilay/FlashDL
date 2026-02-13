@@ -7,7 +7,7 @@ import yt_dlp
 
 app = Flask(__name__)
 
-# ✅ Proper production CORS config
+# ✅ Strong CORS for production
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -26,28 +26,32 @@ def get_ydl_base_options():
         "quiet": True,
         "nocheckcertificate": True,
         "noplaylist": True,
-        "retries": 10,
-        "fragment_retries": 10,
+        "retries": 15,
+        "fragment_retries": 15,
+        "socket_timeout": 30,
+        "geo_bypass": True,
+        "geo_bypass_country": "US",
         "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
         "http_headers": {
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
                 "Chrome/120.0.0.0 Safari/537.36"
-            )
+            ),
+            "Accept-Language": "en-US,en;q=0.9"
         }
     }
 
 
 # -----------------------------
-# Global Error Handler (IMPORTANT)
+# Global Error Handler (Debug Mode Enabled)
 # -----------------------------
 @app.errorhandler(Exception)
 def handle_exception(e):
     print("GLOBAL ERROR:", str(e))
     return jsonify({
         "success": False,
-        "error": "Server error occurred."
+        "error": str(e)  # Shows real error for debugging
     }), 500
 
 
@@ -56,12 +60,10 @@ def handle_exception(e):
 # -----------------------------
 @app.route("/")
 def home():
-    ffmpeg_status = "OK" if is_ffmpeg_installed() else "MISSING"
-    cookie_status = "FOUND" if os.path.exists(COOKIES_FILE) else "MISSING"
     return jsonify({
         "status": "running",
-        "ffmpeg": ffmpeg_status,
-        "cookies": cookie_status
+        "ffmpeg_installed": is_ffmpeg_installed(),
+        "cookies_found": os.path.exists(COOKIES_FILE)
     })
 
 
