@@ -1,127 +1,79 @@
-import os
-import shutil
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 import yt_dlp
+import os
+import uuid
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-COOKIES_FILE = os.path.join(BASE_DIR, 'cookies.txt')
-
-
-# -----------------------------
-# Utility
-# -----------------------------
-def is_ffmpeg_installed():
-    return shutil.which("ffmpeg") is not None
+DOWNLOAD_FOLDER = "downloads"
+os.makedirs(DOWNLOAD_FOLDER, exist_ok=True)
 
 
-def get_ydl_base_options():
-    return {
-        "quiet": True,
-        "nocheckcertificate": True,
-        "noplaylist": True,
-        "retries": 10,
-        "fragment_retries": 10,
-        "geo_bypass": True,
-        "geo_bypass_country": "US",
-        "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
-        "http_headers": {
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/120.0.0.0 Safari/537.36"
-            )
-        }
-    }
-
-
-# -----------------------------
-# Health Route
-# -----------------------------
-@app.route("/")
-def home():
-    return jsonify({
-        "status": "running",
-        "ffmpeg": "OK" if is_ffmpeg_installed() else "MISSING",
-        "cookies": "FOUND" if os.path.exists(COOKIES_FILE) else "MISSING"
-    })
-
-
-# -----------------------------
-# Extract Info Route
-# -----------------------------
+# ---------------------------
+# EXTRACT INFO
+# ---------------------------
 @app.route("/extract", methods=["POST"])
-def extract_info():
-    data = request.json
+def extract():
+    data = request.get_json()
     url = data.get("url")
 
     if not url:
-        return jsonify({"success": False, "error": "No URL provided"}), 400
-
-    ydl_opts = get_ydl_base_options()
-    ydl_opts["skip_download"] = True
-    ydl_opts["format"] = "best"
+        return jsonify({"success": False, "error": "No URL provided"})
 
     try:
+        ydl_opts = {
+            "quiet": True,
+            "skip_download": True,
+        }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
-
-            if "entries" in info:
-                info = info["entries"][0]
 
         return jsonify({
             "success": True,
             "title": info.get("title"),
-            "thumbnail": info.get("thumbnail"),
-            "duration": info.get("duration"),
+            "thumbnail": info.get("thumbnail")
         })
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)})
 
 
-# -----------------------------
-# FREE DOWNLOAD ROUTE
-# -----------------------------
+# ---------------------------
+# DOWNLOAD & SEND FILE
+# ---------------------------
 @app.route("/process_merge")
 def process_merge():
     url = request.args.get("url")
 
     if not url:
-        return jsonify({"success": False, "error": "No URL provided"}), 400
-
-    ydl_opts = get_ydl_base_options()
-    ydl_opts["skip_download"] = True
-    ydl_opts["format"] = "best"
+        return jsonify({"success": False, "error": "No URL provided"})
 
     try:
+        unique_id = str(uuid.uuid4())
+        output_path = os.path.join(DOWNLOAD_FOLDER, f"{unique_id}.mp4")
+
+        ydl_opts = {
+            "format": "bestvideo+bestaudio/best",
+            "outtmpl": output_path,
+            "merge_output_format": "mp4",
+            "quiet": True
+        }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+            ydl.download([url])
 
-            if "entries" in info:
-                info = info["entries"][0]
-
-            direct_url = info.get("url")
-
-        return jsonify({
-            "success": True,
-            "download_url": direct_url,
-            "title": info.get("title")
-        })
+        return send_file(
+            output_path,
+            as_attachment=True,
+            download_name="video.mp4"
+        )
 
     except Exception as e:
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"success": False, "error": str(e)})
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)
