@@ -1,44 +1,221 @@
-# ⚡ **FlashDL** - Universal Social Media Downloader
+# ⚡ FlashDL - Universal Social Media Downloader
 
-**FlashDL** is a high-performance web application designed to facilitate the downloading of videos and images from popular social media platforms, including **YouTube**, **Reddit**, **Instagram**, **TikTok**, and **Pinterest**.
+FlashDL is a high-performance web application that enables users to download videos and images from multiple popular social media platforms through a single, intuitive interface.
 
-Unlike traditional downloaders, FlashDL utilizes **Server-Side Merging**, enabling the seamless download of high-quality YouTube videos (up to 1080p and 4K) with full audio, by processing media files on the backend using FFmpeg.
-
----
-
-## 🚀 **Key Features**
-
-- **Multi-Platform Support**: Download videos and images from a variety of platforms, including Reddit, Instagram, TikTok, Pinterest, and YouTube.
-- **High-Quality YouTube Downloads**: Take advantage of server-side video and audio merging using FFmpeg, ensuring high-definition downloads (1080p/4K).
-- **Audio Extraction**: Effortlessly extract high-bitrate MP3 audio from any supported video link.
-- **Reddit Bypass**: Includes robust error handling to bypass 403 Forbidden errors encountered with Reddit links.
-- **Modern UI**: A clean, responsive design enhanced by Materialize CSS components and support for **Dark Mode**.
-- **User History**: Local storage-based history tracking for authenticated users, allowing easy access to previously downloaded content.
+Unlike conventional downloaders, FlashDL performs **server-side media processing** using **FFmpeg**, allowing high-quality YouTube downloads by merging separate video and audio streams on the backend. This approach supports resolutions up to **1080p and 4K** while preserving original audio quality.
 
 ---
 
-## 🛠️ **Technical Stack**
+## 🌟 Overview
 
-- **Backend**: Python, Flask
-- **Video & Audio Extraction**: `yt-dlp`
-- **Media Processing**: FFmpeg
-- **Frontend**: HTML5, CSS3, Vanilla JavaScript, Materialize CSS
+FlashDL provides a unified solution for downloading media from:
+
+- YouTube
+- Instagram
+- Reddit
+- TikTok
+- Pinterest
+
+The application combines **yt-dlp** for media extraction with **FFmpeg** for server-side processing, ensuring fast, reliable, and high-quality downloads.
 
 ---
 
-## ⚙️ **Installation & Setup**
+# ✨ Features
 
-### 1. **Prerequisites**
+## 📥 Multi-Platform Downloader
 
-Ensure that the following dependencies are installed before proceeding:
+Download videos and images from multiple social media platforms through a single interface.
 
-- **Python 3.8+**
-- **FFmpeg**: FFmpeg is required for media merging. Ensure FFmpeg is installed and accessible through your system PATH.
+Supported platforms:
 
-### 2. **Clone the Repository**
+- YouTube
+- Reddit
+- Instagram
+- TikTok
+- Pinterest
 
-Clone the repository to your local machine:
+---
+
+## 🎥 High-Quality YouTube Downloads
+
+Unlike standard downloaders that only retrieve a single media stream, FlashDL downloads the highest available video and audio streams separately and merges them using FFmpeg on the server.
+
+Supports:
+
+- 720p
+- 1080p
+- 1440p
+- 4K (where available)
+
+---
+
+## 🎵 Audio Extraction
+
+Extract high-quality MP3 audio directly from supported video URLs.
+
+Perfect for:
+
+- Music
+- Podcasts
+- Lectures
+- Audiobooks
+
+---
+
+## 🛡 Reddit Compatibility
+
+Includes additional handling for Reddit media URLs to reduce common download failures, including 403 Forbidden responses.
+
+---
+
+## 🎨 Modern User Interface
+
+Designed with a clean and responsive interface using Materialize CSS.
+
+Features include:
+
+- Responsive layout
+- Dark Mode
+- Mobile-friendly design
+- Fast navigation
+
+---
+
+## 📜 Download History
+
+Stores download history locally in the browser, allowing authenticated users to quickly revisit previously downloaded media.
+
+---
+
+# 🛠 Technology Stack
+
+## Backend
+
+- Python
+- Flask
+
+## Media Processing
+
+- FFmpeg
+
+## Media Extraction
+
+- yt-dlp
+
+## Frontend
+
+- HTML5
+- CSS3
+- Vanilla JavaScript
+- Materialize CSS
+
+---
+
+# ⚙ Installation
+
+## Prerequisites
+
+Before running FlashDL, install the following:
+
+- Python 3.8 or newer
+- FFmpeg (must be added to your system PATH)
+- Git
+
+---
+
+## Clone Repository
 
 ```bash
-git clone https://github.com/yourusername/social_downloader.git
-cd social_downloader
+git clone https://github.com/yourusername/flashdl.git
+cd flashdl
+```
+
+---
+
+## Create Virtual Environment
+
+### Windows
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+### Linux / macOS
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+---
+
+## Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Run the Application
+
+```bash
+python app.py
+```
+
+The application will be available at:
+
+```
+http://localhost:5000
+```
+
+---
+
+# 📂 Project Structure
+
+```
+FlashDL/
+│
+├── app.py
+├── requirements.txt
+├── static/
+│   ├── css/
+│   ├── js/
+│   └── images/
+│
+├── templates/
+│   ├── index.html
+│   └── history.html
+│
+├── downloads/
+├── utils/
+└── README.md
+```
+
+---
+
+# 🚀 Future Improvements
+
+- Playlist downloading
+- Batch URL processing
+- Subtitle downloading
+- Download scheduling
+- User accounts and cloud history
+- Browser extension
+- Docker deployment
+- Download queue management
+
+---
+
+# 📄 License
+
+This project is intended for educational and personal use only.
+
+Users are responsible for complying with the terms of service and copyright policies of the respective platforms.
+
+---
+
+## 👨‍💻 Developed By
+
+**Nilay Naha**
