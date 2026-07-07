@@ -1,79 +1,596 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FlashDL - Universal Downloader</title>
-    <link rel="icon" href="https://cdnjs.cloudflare.com/ajax/libs/material-design-icons/3.0.1/action/2x/ic_get_app_black_48dp.png">
+    <!-- Modern & Cohesive Font Imports (Syne, Syncopate, Plus Jakarta Sans, JetBrains Mono, Geist) -->
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&family=Syncopate:wght@700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <nav>
         <div class="nav-wrapper container">
-            <a href="#" class="brand-logo serif-font"><i class="material-icons">bolt</i> FlashDL</a>
+            <a href="#" class="brand-logo">
+                <i class="material-icons text-primary">bolt</i> FlashDL
+            </a>
             <ul class="right">
-                <li><a href="javascript:void(0)" id="theme-toggle"><i class="material-icons" id="theme-icon">dark_mode</i></a></li>
-                <li id="auth-btn"><a href="#login-modal" class="modal-trigger nav-btn btn-black waves-effect">Sign In</a></li>
-                <li id="user-display" style="display:none;"><a href="#" id="logout-btn" class="nav-btn btn-ghost">Logout</a></li>
+                <li>
+                    <a href="javascript:void(0)" id="theme-toggle" aria-label="Toggle theme">
+                        <i class="material-icons" id="theme-icon">dark_mode</i>
+                    </a>
+                </li>
+                <li id="auth-btn">
+                    <a href="#login-modal" class="modal-trigger nav-btn btn-black waves-effect">Sign In</a>
+                </li>
+                <li id="user-display" style="display:none; align-items: center;">
+                    <a href="#profile-modal" class="modal-trigger profile-pill">
+                        <img id="nav-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=Flash" class="nav-avatar-img" alt="avatar">
+                        <span id="nav-username" class="font-body-sm font-semibold">User</span>
+                    </a>
+                    <!-- Pointed directly to the Logout Reconfirmation Modal -->
+                    <a href="#logout-confirm-modal" id="logout-btn" class="modal-trigger nav-btn btn-ghost" style="margin-left: 12px; height: 38px; line-height: 38px; padding: 0 14px;">Logout</a>
+                </li>
             </ul>
         </div>
     </nav>
 
-    <section class="hero-section">
-        <div class="container">
-            <span class="pill-badge fade-in">Free & Unlimited Downloads</span>
-            <h1 class="hero-title fade-in">Download From <br><span>Any Platform</span></h1>
-            
-            <div class="download-container fade-in-up">
-                <div class="input-box">
-                    <i class="material-icons prefix-icon">link</i>
-                    <input id="url-input" type="text" placeholder="Paste your link here...">
-                    <i class="material-icons clear-btn" id="clear-btn" style="display: none;">close</i>
+    <main>
+        <!-- Hero Download Section -->
+        <section class="hero-section">
+            <div class="container">
+                <span class="pill-badge fade-in font-label-caps">Free &amp; Unlimited Downloads</span>
+
+                <h1 class="hero-title fade-in">
+                    Download From<br><span>Any Platform</span>
+                </h1>
+
+                <p class="hero-subtitle fade-in font-body-md">
+                    Paste a link, fetch media details, and download in seconds with FlashDL.
+                </p>
+
+                <!-- High-Speed Input, Instant Clipboard Paste, & Segmented Toggle Dock -->
+                <div class="download-container fade-in-up">
+                    <div class="input-box">
+                        <i class="material-icons prefix-icon">link</i>
+                        <input id="url-input" type="text" placeholder="Paste your link here..." autocomplete="off">
+                        <i class="material-icons clear-btn" id="clear-btn" style="display:none;">close</i>
+                    </div>
+                    <!-- Quick Clipboard Paste Button -->
+                    <button id="paste-btn" class="btn-hero btn-paste waves-effect waves-light font-body-md font-semibold">
+                        <i class="material-icons">content_paste</i> Paste
+                    </button>
+                    <button id="download-btn" class="btn-hero waves-effect waves-light font-body-md font-bold">
+                        Analyze Link <i class="material-icons right">bolt</i>
+                    </button>
                 </div>
-                <button id="download-btn" class="btn-hero waves-effect waves-light">
-                    Download <i class="material-icons right">download</i>
-                </button>
+
+                <!-- Format Toggle (Video/Audio Switch) -->
+                <div class="format-toggle-container fade-in-up">
+                    <button id="toggle-mp4" class="toggle-pill active font-label-caps"><i class="material-icons">movie</i> Video (MP4)</button>
+                    <button id="toggle-mp3" class="toggle-pill font-label-caps"><i class="material-icons">audiotrack</i> Audio (MP3)</button>
+                </div>
+
+                <p class="login-hint font-body-sm" id="login-hint">
+                    <a href="#login-modal" class="modal-trigger">Sign in</a> to save your download history.
+                </p>
+
+                <!-- Premium Real-Time Progress Tracker (With Auto-Resume Connectivity Shield) -->
+                <div id="progress-container" class="progress-card fade-in-up" style="display:none;">
+                    <div class="progress-header">
+                        <div class="status-group">
+                            <span id="pulse-indicator" class="pulse-indicator"></span>
+                            <span id="progress-status" class="font-body-md font-semibold">Preparing your download...</span>
+                        </div>
+                        <span id="progress-percent" class="font-status-code font-bold text-primary">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="progress-stats font-status-code">
+                        <span id="progress-speed" class="stat-item"><i class="material-icons">speed</i> <span class="val">0.0 MB/s</span></span>
+                        <span id="progress-eta" class="stat-item"><i class="material-icons">schedule</i> <span class="val">ETA: --:--</span></span>
+                        <span id="progress-size" class="stat-item"><i class="material-icons">data_usage</i> <span class="val">0 MB / 0 MB</span></span>
+                    </div>
+                </div>
+
+                <div id="loader" class="progress" style="display:none;">
+                    <div class="indeterminate"></div>
+                </div>
+
+                <div id="error-msg" class="error-msg font-body-sm font-semibold"></div>
+
+                <!-- Result Card containing Playlist and QR Code Mobile integration options -->
+                <div id="result-area" style="display:none;">
+                    <div class="result-card fade-in-up">
+                        <img id="res-thumb" class="res-thumb" src="" alt="Preview thumbnail">
+                        <div class="res-details">
+                            <h6 id="res-title" class="font-headline-lg">Media Title</h6>
+                            <div class="result-action-row" style="display: flex; gap: 12px; align-items: center; margin-top: 12px; flex-wrap: wrap;">
+                                <a id="res-link" href="#" class="btn-dl waves-effect font-body-md font-bold">Download Now</a>
+                                <button id="add-to-playlist-btn" class="btn-ghost-outline font-body-sm font-semibold" style="height: 42px; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="material-icons">bookmark_add</i> Save to Playlist
+                                </button>
+                                <!-- Send to Phone via Dynamic QR Button -->
+                                <button id="qr-share-btn" class="btn-ghost-outline font-body-sm font-semibold" style="height: 42px; display: inline-flex; align-items: center; gap: 6px;">
+                                    <i class="material-icons">qr_code</i> Send to Phone
+                                </button>
+                            </div>
+                            
+                            <!-- Inline Playlists & Collections dropdown -->
+                            <div id="playlist-selector-dropdown" class="playlist-selector-dropdown" style="display: none; margin-top: 16px;">
+                                <label class="font-label-caps" style="color: var(--text-muted); display: block; margin-bottom: 6px;">Choose Collection</label>
+                                <select id="playlist-select" class="browser-default" style="margin-bottom: 12px;"></select>
+                                <div style="display: flex; gap: 8px;">
+                                    <input id="new-playlist-input" type="text" placeholder="Or create a new playlist..." style="height: 38px; padding: 0 12px; margin: 0; flex-grow: 1;">
+                                    <button id="confirm-add-playlist-btn" class="btn-hero" style="height: 38px; padding: 0 16px; font-size: 13px;">Save</button>
+                                </div>
+                            </div>
+
+                            <!-- Inline QR Code mobile container -->
+                            <div id="qr-code-container" class="playlist-selector-dropdown" style="display: none; margin-top: 16px; text-align: center; border: 1px solid var(--primary-color);">
+                                <label class="font-label-caps" style="color: var(--text-main); display: block; margin-bottom: 8px;">Scan to Download on Mobile</label>
+                                <div style="background: white; padding: 12px; display: inline-block; border-radius: 8px; margin-bottom: 8px; box-shadow: var(--shadow-sm);">
+                                    <img id="qr-code-img" src="" alt="Download QR Link" style="width: 140px; height: 140px; display: block;">
+                                </div>
+                                <p class="font-body-sm text-muted" style="margin: 0; font-size: 11px;">Open your phone's camera to scan and download directly onto your device.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Supported Social Media Platforms Infinite Marquee -->
+                <div class="platforms-section fade-in-up">
+                    <h4 class="platforms-title font-headline-lg font-bold">Supported Platforms</h4>
+                    <div class="marquee-container">
+                        <div class="marquee-wrapper">
+                            <div class="marquee-content">
+                                <img src="/assets/facebook.png" alt="facebook">
+                                <img src="/assets/x.png" alt="x">
+                                <img src="/assets/instagram.png" alt="instagram">
+                                <img src="/assets/linkedin.png" alt="linkedin">
+                                <img src="/assets/pinterest.png" alt="pinterest">
+                                <img src="/assets/threads.png" alt="threads">
+                                <img src="/assets/tik-tok.png" alt="tik-tok">
+                                <img src="/assets/reddit.png" alt="reddit">
+                                <img src="/assets/youtube.png" alt="youtube">
+                            </div>
+                            <div class="marquee-content" aria-hidden="true">
+                                <img src="/assets/facebook.png" alt="facebook">
+                                <img src="/assets/x.png" alt="x">
+                                <img src="/assets/instagram.png" alt="instagram">
+                                <img src="/assets/linkedin.png" alt="linkedin">
+                                <img src="/assets/pinterest.png" alt="pinterest">
+                                <img src="/assets/threads.png" alt="threads">
+                                <img src="/assets/tik-tok.png" alt="tik-tok">
+                                <img src="/assets/reddit.png" alt="reddit">
+                                <img src="/assets/youtube.png" alt="youtube">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download History Segment (Hidden by Default until login) -->
+                <section id="history-section" class="history-section" style="display:none;">
+                    <div class="history-header">
+                        <h4 class="font-headline-lg font-bold">Download History</h4>
+                        <button id="clear-history" class="btn-ghost-outline font-label-caps font-bold">Clear</button>
+                    </div>
+
+                    <div class="history-container">
+                        <table class="highlight responsive-table">
+                            <thead>
+                                <tr>
+                                    <th class="font-label-caps">Media</th>
+                                    <th class="font-label-caps">Title</th>
+                                    <th class="font-label-caps">Date</th>
+                                    <th class="font-label-caps">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="history-table-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </section>
+
+        <!-- Dynamic Marketing & Explainer Layout Block -->
+        <div class="landing-content-flow container">
+
+            <!-- Draggable Bookmarklet Card -->
+            <section class="content-block fade-in-up">
+                <div class="block-header center-align">
+                    <span class="pill-badge font-label-caps">Extension Free</span>
+                    <h3 class="font-headline-lg font-bold">One-Click Bookmarklet</h3>
+                    <p class="font-body-md text-muted">Drastically speed up your flow. Drag this button to your bookmarks bar to analyze videos instantly!</p>
+                </div>
+                <div class="bookmarklet-container center-align">
+                    <a href="javascript:(function(){var url=window.location.href;window.open('https://flashdl-backend-2026.onrender.com/?url='+encodeURIComponent(url),'_blank');})();" class="btn-hero waves-effect waves-light font-body-md font-bold bookmarklet-btn" style="border-radius: 999px; padding: 0 40px; border: 2px dashed rgba(37,99,235,0.4)">
+                        <i class="material-icons left">bookmark</i> Drag to Bookmarks: FlashDL
+                    </a>
+                    <p class="font-body-sm text-muted" style="margin-top: 18px; max-width: 550px; margin-left: auto; margin-right: auto;">
+                        <strong>Usage Instructions:</strong> Drag the button above straight to your browser's Bookmarks/Favorites bar. Whenever you are browsing a video on YouTube, TikTok, or Instagram, simply click the bookmark to instantly load, format, and prepare the file in FlashDL.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Segment: How It Works -->
+            <section class="content-block fade-in-up">
+                <div class="block-header center-align">
+                    <span class="pill-badge font-label-caps">Step-by-Step</span>
+                    <h3 class="font-headline-lg font-bold">How It Works</h3>
+                    <p class="font-body-md text-muted">Get your favorite media in three simple steps without unnecessary barriers.</p>
+                </div>
+                <div class="row grid-container margin-top-md">
+                    <div class="col s12 m4">
+                        <div class="step-card">
+                            <span class="step-number font-status-code text-primary font-bold">01</span>
+                            <h5 class="font-body-md font-bold">Copy Media link</h5>
+                            <p class="font-body-sm text-muted">Navigate to your preferred platform (YouTube, TikTok, Instagram, etc.) and copy the shareable URL of the media.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m4">
+                        <div class="step-card">
+                            <span class="step-number font-status-code text-primary font-bold">02</span>
+                            <h5 class="font-body-md font-bold">Paste &amp; Analyze</h5>
+                            <p class="font-body-sm text-muted">Insert the copied link into the analyzer above. Our server immediately resolves structural formats and merges parameters.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m4">
+                        <div class="step-card">
+                            <span class="step-number font-status-code text-primary font-bold">03</span>
+                            <h5 class="font-body-md font-bold">Download Instantly</h5>
+                            <p class="font-body-sm text-muted">Track the active visual progress card and retrieve your high-fidelity, high-definition final media file onto your drive.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Segment: Popular Use Cases -->
+            <section class="content-block fade-in-up">
+                <div class="block-header center-align">
+                    <span class="pill-badge font-label-caps">Utility Hub</span>
+                    <h3 class="font-headline-lg font-bold">Popular Use Cases</h3>
+                    <p class="font-body-md text-muted">Discover how educators, creators, and daily consumers utilize our extraction engine.</p>
+                </div>
+                <div class="row grid-container margin-top-md">
+                    <div class="col s12 m6 l3">
+                        <div class="case-card">
+                            <i class="material-icons card-icon">flight_takeoff</i>
+                            <h5 class="font-body-md font-semibold">Offline Entertainment</h5>
+                            <p class="font-body-sm text-muted">Save high-definition clips and audio arrays for reliable playback during flights, commutes, or remote travel.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m6 l3">
+                        <div class="case-card">
+                            <i class="material-icons card-icon">school</i>
+                            <h5 class="font-body-md font-semibold">Educational Archiving</h5>
+                            <p class="font-body-sm text-muted">Backup key tutorials, references, and lectures for curriculum development and continuous classroom access.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m6 l3">
+                        <div class="case-card">
+                            <i class="material-icons card-icon">video_library</i>
+                            <h5 class="font-body-md font-semibold">Creative Repurposing</h5>
+                            <p class="font-body-sm text-muted">Safely collect source references, fair-use b-roll material, and personal footage directly onto desktop editors.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m6 l3">
+                        <div class="case-card">
+                            <i class="material-icons card-icon">folder_special</i>
+                            <h5 class="font-body-md font-semibold">Personal Digital Backups</h5>
+                            <p class="font-body-sm text-muted">Shield your absolute favorite streams, user publications, and memorable threads from account deletions.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Segment: Works on Every Device & Browser -->
+            <section class="content-block fade-in-up bg-accent-block">
+                <div class="row grid-container" style="align-items: center; margin: 0;">
+                    <div class="col s12 l6">
+                        <span class="pill-badge font-label-caps" style="background: rgba(37, 99, 235, 0.1); color: var(--primary-color);">Compatibility</span>
+                        <h3 class="font-headline-lg font-bold" style="margin-top: 12px;">Works on Every Device &amp; Browser</h3>
+                        <p class="font-body-md text-muted" style="margin-bottom: 20px;">
+                            Our social media downloader is a web-based tool that works directly in your browser. No app download or browser extension needed. Just paste a URL and go.
+                        </p>
+                        <div style="margin-bottom: 24px;">
+                            <h5 class="font-body-md font-bold" style="display: flex; align-items: center; gap: 8px;"><i class="material-icons text-primary" style="font-size: 20px;">phone_iphone</i> iPhone, iPad &amp; Android</h5>
+                            <p class="font-body-sm text-muted">
+                                Download videos on iPhone using Safari, on iPad, or on any Android phone using Chrome or Samsung Internet. No app installation required. The downloader runs entirely in your mobile browser.
+                            </p>
+                        </div>
+                        <div style="margin-bottom: 24px;">
+                            <h5 class="font-body-md font-bold" style="display: flex; align-items: center; gap: 8px;"><i class="material-icons text-primary" style="font-size: 20px;">laptop_mac</i> PC, Mac &amp; Chromebook</h5>
+                            <p class="font-body-sm text-muted">
+                                Use the social media downloader on Windows, macOS, or Chromebook. Works in every modern desktop browser. No software to install, no desktop app needed.
+                            </p>
+                        </div>
+                        <div>
+                            <h5 class="font-body-md font-semibold" style="display: flex; align-items: center; gap: 8px;"><i class="material-icons text-primary" style="font-size: 20px;">language</i> All Modern Browsers</h5>
+                            <p class="font-body-sm text-muted">
+                                Fully compatible with Chrome, Safari, Firefox, Edge, Opera, and Brave. No browser extension or plugin required. Processing happens server-side for instant results.
+                            </p>
+                        </div>
+                    </div>
+                    <div class="col s12 l6">
+                        <div class="chip-container-card">
+                            <div class="chip-group">
+                                <label class="font-label-caps text-muted">Supported Hardware Engines</label>
+                                <div class="badge-row">
+                                    <span class="badge-chip"><i class="fab fa-apple"></i> iPhone</span>
+                                    <span class="badge-chip"><i class="fas fa-tablet-alt"></i> iPad</span>
+                                    <span class="badge-chip"><i class="fab fa-android"></i> Android</span>
+                                    <span class="badge-chip"><i class="fab fa-windows"></i> Windows PC</span>
+                                    <span class="badge-chip"><i class="fas fa-laptop-code"></i> MacBook</span>
+                                    <span class="badge-chip"><i class="fas fa-laptop"></i> Chromebook</span>
+                                </div>
+                            </div>
+                            <div class="chip-group" style="margin-top: 32px;">
+                                <label class="font-label-caps text-muted">Certified Browsers</label>
+                                <div class="badge-row">
+                                    <span class="badge-chip"><i class="fab fa-chrome"></i> Chrome</span>
+                                    <span class="badge-chip"><i class="fab fa-safari"></i> Safari</span>
+                                    <span class="badge-chip"><i class="fab fa-firefox"></i> Firefox</span>
+                                    <span class="badge-chip"><i class="fab fa-edge"></i> Edge</span>
+                                    <span class="badge-chip"><i class="fab fa-opera"></i> Opera</span>
+                                    <span class="badge-chip"><i class="fas fa-shield-alt"></i> Brave</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Segment: Why Choose Our Free Social Media Downloader? -->
+            <section class="content-block fade-in-up">
+                <div class="block-header center-align">
+                    <span class="pill-badge font-label-caps">Why Choose Us</span>
+                    <h3 class="font-headline-lg font-bold">Why Choose Our Free Downloader?</h3>
+                    <p class="font-body-md text-muted">Our high-speed extraction layers are optimized to offer premium features without hidden limits.</p>
+                </div>
+                <div class="row grid-container margin-top-md">
+                    <div class="col s12 m4">
+                        <div class="choice-card">
+                            <span class="card-metric text-primary">01</span>
+                            <h5 class="font-body-md font-bold">Unlimited Downloads</h5>
+                            <p class="font-body-sm text-muted">Absolutely no daily download limits, bandwidth restrictions, or hidden fees. Extract what you need, whenever you need it.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m4">
+                        <div class="choice-card">
+                            <span class="card-metric text-primary">02</span>
+                            <h5 class="font-body-md font-bold">High-Speed Merging</h5>
+                            <p class="font-body-sm text-muted">Leverages server-side cloud infrastructure to instantly package combined high-definition visual and audio pipelines seamlessly.</p>
+                        </div>
+                    </div>
+                    <div class="col s12 m4">
+                        <div class="choice-card">
+                            <span class="card-metric text-primary">03</span>
+                            <h5 class="font-body-md font-bold">Universal Compatibility</h5>
+                            <p class="font-body-sm text-muted">No external software packages, installations, or configurations. Just copy, paste, and let our cloud layers process the media.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Segment: Privacy, Security & Compliance -->
+            <section class="content-block fade-in-up">
+                <div class="block-header center-align">
+                    <span class="pill-badge font-label-caps">Security-First</span>
+                    <h3 class="font-headline-lg font-bold">Privacy, Security &amp; Compliance</h3>
+                    <p class="font-body-md text-muted">We respect user boundaries. Your active extractions are fully secure, confidential, and transient.</p>
+                </div>
+                <div class="row grid-container margin-top-md">
+                    <div class="col s12 m6">
+                        <div class="security-card">
+                            <div style="display: flex; gap: 16px;">
+                                <i class="material-icons text-primary" style="font-size: 32px; flex-shrink: 0;">lock_outline</i>
+                                <div>
+                                    <h5 class="font-body-md font-bold" style="margin: 0 0 8px 0;">On-The-Fly Streaming</h5>
+                                    <p class="font-body-sm text-muted" style="margin: 0;">We do not keep local repositories of downloaded files. Files are temporarily processed and immediately expunged from the host after delivery to safeguard user privacy.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col s12 m6">
+                        <div class="security-card">
+                            <div style="display: flex; gap: 16px;">
+                                <i class="material-icons text-primary" style="font-size: 32px; flex-shrink: 0;">gavel</i>
+                                <div>
+                                    <h5 class="font-body-md font-bold" style="margin: 0 0 8px 0;">Strict Platform Compliance</h5>
+                                    <p class="font-body-sm text-muted" style="margin: 0;">Our tooling operates within public, open-source protocol parameters. We urge users to only extract material they own, hold the rights to, or use under fair copyright principles.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Segment: Frequently Asked Questions -->
+            <section class="content-block fade-in-up" style="margin-bottom: 96px;">
+                <div class="block-header center-align">
+                    <span class="pill-badge font-label-caps">FAQ</span>
+                    <h3 class="font-headline-lg font-bold">Frequently Asked Questions</h3>
+                    <p class="font-body-md text-muted">Got questions about formats, limits, or security? We've got answers.</p>
+                </div>
+                <div class="faq-container margin-top-md">
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <span>Is FlashDL free? Are there any hidden charges?</span>
+                            <i class="material-icons faq-arrow">expand_more</i>
+                        </div>
+                        <div class="faq-answer">
+                            <p class="font-body-sm text-muted">Yes, FlashDL is completely free. We do not restrict features, charge for high-definition video processing, or require a paid subscription to access its core merging engine.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <span>Do I need to install any apps or extensions?</span>
+                            <i class="material-icons faq-arrow">expand_more</i>
+                        </div>
+                        <div class="faq-answer">
+                            <p class="font-body-sm text-muted">No installations are necessary. FlashDL runs entirely as a web-based client application. You do not need to download sketchy desktop wrappers, custom plugins, or browser extensions.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <span>Can I download media in 1080p Full HD?</span>
+                            <i class="material-icons faq-arrow">expand_more</i>
+                        </div>
+                        <div class="faq-answer">
+                            <p class="font-body-sm text-muted">Absolutely. Standard platforms separate high-definition media tracks (e.g., video and audio streams). Our backend dynamically compiles and merges these streams using FFmpeg processing to provide crystal-clear output.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <span>Are my downloads private? Do you log video URLs?</span>
+                            <i class="material-icons faq-arrow">expand_more</i>
+                        </div>
+                        <div class="faq-answer">
+                            <p class="font-body-sm text-muted">Yes, your downloads are completely private. We don't save your personal downloads or store logs of active extractions. Furthermore, your optional sign-in data and download history are saved purely inside your local browser's storage.</p>
+                        </div>
+                    </div>
+                    <div class="faq-item">
+                        <div class="faq-question">
+                            <span>Which social media platforms are supported?</span>
+                            <i class="material-icons faq-arrow">expand_more</i>
+                        </div>
+                        <div class="faq-answer">
+                            <p class="font-body-sm text-muted">FlashDL is designed as a universal tool. It extracts media smoothly from major platforms, including YouTube, X (formerly Twitter), Instagram, TikTok, Reddit, Pinterest, Threads, and LinkedIn.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <!-- Custom Blur Overlay Modal (Sign In) -->
+    <div id="login-modal" class="modal">
+        <div class="modal-content center-align">
+            <h4 class="font-headline-lg font-bold">Welcome Back</h4>
+            <p class="modal-subtitle font-body-sm text-muted">Sign in to save your history locally.</p>
+            <div class="input-field-custom">
+                <input id="email" type="email" placeholder="Enter your email" autocomplete="off" required>
+            </div>
+            <!-- Dynamic validation warning -->
+            <div id="login-validation-error" class="error-msg font-body-sm font-semibold" style="display: none; margin: -10px 0 15px 0;"></div>
+            
+            <button id="confirm-login" class="btn-hero modal-btn font-body-md font-bold">Sign In</button>
+        </div>
+    </div>
+
+    <!-- Custom Blur Overlay Modal (Logout Confirmation / Danger Zone) -->
+    <div id="logout-confirm-modal" class="modal">
+        <div class="modal-content center-align">
+            <h4 class="font-headline-lg font-bold" style="color: #ef4444; margin-bottom: 12px;">Sign Out</h4>
+            <p class="font-body-sm text-muted" style="margin-bottom: 24px; line-height: 1.5;">
+                Are you sure you want to sign out of FlashDL? Your custom collections and local download history will be safely preserved, but you must sign back in to view them.
+            </p>
+            <div style="display: flex; gap: 12px; margin-top: 16px;">
+                <button id="cancel-logout-btn" class="btn-hero btn-paste modal-btn font-body-md font-semibold" style="flex: 1; height: 48px; border-radius: var(--radius-md); margin: 0;">Cancel</button>
+                <button id="confirm-logout-btn" class="btn-hero modal-btn font-body-md font-bold" style="flex: 1; height: 48px; background: #ef4444 !important; color: white !important; border-radius: var(--radius-md); margin: 0;">Log Out</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unified Profile Settings, Activity & Playlist collections Modal -->
+    <div id="profile-modal" class="modal" style="max-width: 600px;">
+        <div class="modal-content text-left">
+            <div class="profile-dashboard-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h4 class="font-headline-lg font-bold" style="margin: 0; font-size: 28px;">Profile &amp; Settings</h4>
+                <i class="material-icons close-dashboard" style="cursor: pointer; color: var(--text-muted);" id="close-profile-btn">close</i>
             </div>
             
-            <p class="login-hint" id="login-hint"><a href="#login-modal" class="modal-trigger">Sign in</a> to save your download history.</p>
-            <div id="loader" class="progress" style="display:none;"><div class="indeterminate"></div></div>
-            <div id="error-msg" class="red-text" style="font-weight: bold;"></div>
-
-            <div id="result-area" style="display: none;">
-                <div class="result-card fade-in-up">
-                    <img id="res-thumb" class="res-thumb" src="" alt="Thumb">
-                    <div class="res-details">
-                        <h6 id="res-title">Media Title</h6>
-                        <a id="res-link" href="#" class="btn-dl waves-effect">Download Now</a>
+            <div class="profile-card-details" style="display: flex; gap: 24px; align-items: center; padding-bottom: 24px; border-bottom: 1px solid var(--border-color); margin-bottom: 24px;">
+                <div class="avatar-upload-container" style="position: relative; width: 80px; height: 80px; flex-shrink: 0;">
+                    <img id="profile-avatar-preview" src="https://api.dicebear.com/7.x/bottts/svg?seed=Flash" class="avatar-preview-img" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color);">
+                    <label for="avatar-file-input" class="avatar-edit-badge" style="position: absolute; bottom: 0; right: 0; background: var(--primary-color); color: #fff; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform 0.2s;">
+                        <i class="material-icons" style="font-size: 14px;">camera_alt</i>
+                    </label>
+                    <input type="file" id="avatar-file-input" accept="image/*" style="display: none;">
+                </div>
+                
+                <div class="profile-info-fields" style="flex: 1; display: flex; flex-direction: column; gap: 12px;">
+                    <div>
+                        <label class="font-label-caps" style="color: var(--text-muted); display: block; margin-bottom: 4px; font-size: 10px;">Display Name</label>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input id="profile-username-input" type="text" class="font-body-md font-semibold" style="border: none; background: transparent; border-bottom: 1px dashed var(--border-color); color: var(--text-main); margin: 0; height: 32px; padding: 0; width: 100%;" value="Flash Downloader" autocomplete="off">
+                            <button id="save-profile-name-btn" class="btn-ghost" style="height: 32px; line-height: 30px; padding: 0 12px; font-size: 12px; display: none;">Save</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-label-caps" style="color: var(--text-muted); display: block; margin-bottom: 4px; font-size: 10px;">Account Email</label>
+                        <span id="profile-email-display" class="font-body-sm font-semibold text-muted">user@example.com</span>
                     </div>
                 </div>
             </div>
 
-            <section id="history-section" style="display: none; margin-top: 50px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <h4 class="serif-font">Download History</h4>
-                    <button id="clear-history" class="btn-ghost" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0 10px;">Clear</button>
-                </div>
-                <div class="history-container">
-                    <table class="highlight">
-                        <thead><tr><th>Media</th><th>Title</th><th>Date</th><th>Action</th></tr></thead>
-                        <tbody id="history-table-body"></tbody>
-                    </table>
-                </div>
-            </section>
-        </div>
-    </section>
+            <!-- Profile Dashboard Activity Tracker -->
+            <div class="profile-history-sub">
+                <h5 class="font-body-md font-semibold" style="margin-top: 0; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
+                    <i class="material-icons text-primary" style="font-size: 18px;">history</i> Recent Download Stream
+                </h5>
+                <div id="profile-history-list" style="max-height: 180px; overflow-y: auto; padding-right: 4px;"></div>
+            </div>
 
-    <div id="login-modal" class="modal">
-        <div class="modal-content center-align">
-            <h4 class="serif-font">Welcome</h4>
-            <div class="input-field"><input id="email" type="email" placeholder="Email"></div>
-            <button id="confirm-login" class="btn-hero" style="width: 100%; justify-content: center;">Sign In</button>
+            <!-- Playlists & Collections Dashboard Segment -->
+            <div class="profile-history-sub" style="margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--border-color);">
+                <h5 class="font-body-md font-semibold" style="margin-top: 0; margin-bottom: 14px; display: flex; align-items: center; gap: 6px;">
+                    <i class="material-icons text-primary" style="font-size: 18px;">folder</i> My Collections
+                </h5>
+                <div id="collections-container" style="max-height: 220px; overflow-y: auto; padding-right: 4px;"></div>
+            </div>
         </div>
     </div>
+
+    <!-- Premium Footer Block -->
+    <footer class="page-footer-custom">
+        <div class="container">
+            <div class="row" style="margin-bottom: 40px; display: flex; flex-wrap: wrap;">
+                <div class="col s12 l4" style="margin-bottom: 24px;">
+                    <a href="#" class="brand-logo" style="display: inline-flex; align-items: center; gap: 8px; color: var(--text-main); margin-bottom: 16px;">
+                        <i class="material-icons text-primary">bolt</i> FlashDL
+                    </a>
+                    <p class="font-body-sm text-muted" style="max-width: 320px;">
+                        High-performance universal extraction engine designed for fast browser-side download pipelines with secure, serverless processing.
+                    </p>
+                </div>
+                <div class="col s6 m3 l2 offset-l2" style="margin-bottom: 24px;">
+                    <h6 class="font-label-caps font-bold" style="color: var(--text-main); margin-bottom: 16px;">Capabilities</h6>
+                    <ul class="footer-links">
+                        <li><a href="#" class="font-body-sm text-muted">HD Video Merger</a></li>
+                        <li><a href="#" class="font-body-sm text-muted">Audio Extractor</a></li>
+                        <li><a href="#" class="font-body-sm text-muted">Platform Parsing</a></li>
+                    </ul>
+                </div>
+                <div class="col s6 m3 l2" style="margin-bottom: 24px;">
+                    <h6 class="font-label-caps font-bold" style="color: var(--text-main); margin-bottom: 16px;">Legal</h6>
+                    <ul class="footer-links">
+                        <li><a href="#" class="font-body-sm text-muted">Terms of Service</a></li>
+                        <li><a href="#" class="font-body-sm text-muted">Privacy Policy</a></li>
+                        <li><a href="#" class="font-body-sm text-muted">DMCA Compliance</a></li>
+                    </ul>
+                </div>
+                <div class="col s12 m6 l2" style="margin-bottom: 24px;">
+                    <h6 class="font-label-caps font-bold" style="color: var(--text-main); margin-bottom: 16px;">Secure Pipeline</h6>
+                    <div class="secure-footer-badge" style="display: flex; align-items: center; gap: 8px; color: var(--text-muted);">
+                        <i class="material-icons text-primary" style="font-size: 20px;">verified_user</i>
+                        <span>TLS 1.3 encrypted</span>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom-bar" style="border-top: 1px solid var(--border-color); padding-top: 24px; text-align: center;">
+                <p class="text-muted" style="font-size: 11px; margin: 0;">
+                    &copy; 2026 FlashDL. Crafted with privacy &amp; velocity. All platform trade symbols property of respected networks.
+                </p>
+            </div>
+        </div>
+    </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
     <script src="/static/js/app.js"></script>
